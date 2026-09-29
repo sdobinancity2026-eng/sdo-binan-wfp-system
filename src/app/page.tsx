@@ -281,7 +281,7 @@ function handleSignOut() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* Header */}
+     {/* Header */}
       <header className="bg-blue-900 text-white shadow-md border-b-4 border-amber-400">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
@@ -293,16 +293,28 @@ function handleSignOut() {
               <div className="flex items-center gap-3 bg-blue-950 px-3 py-1.5 rounded-lg border border-blue-800">
                 <div className="text-right">
                   <p className="text-xs font-bold text-amber-400 flex items-center justify-end gap-1">
-                    <UserCheck className="w-3.5 h-3.5" /> {currentUser.email}
+                    <UserCheck className="w-3.5 h-3.5" /> {currentUser.name || currentUser.email}
                   </p>
                   <p className="text-[10px] uppercase tracking-wider text-blue-300 font-bold">
                     Role: <span className="text-emerald-400">{userRole || 'Admin'}</span>
                   </p>
                 </div>
+
+                {/* Control Center Button for Admins */}
+                {userRole === 'admin' && (
+                  <button
+                    onClick={() => router.push('/admin/users')}
+                    className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-extrabold text-xs px-2.5 py-1 rounded shadow transition"
+                    title="Open Super Admin User Management"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" /> Control Center
+                  </button>
+                )}
+
                 <button
                   onClick={handleSignOut}
                   title="Sign Out"
-                  className="bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded transition"
+                  className="bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded transition ml-1"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
