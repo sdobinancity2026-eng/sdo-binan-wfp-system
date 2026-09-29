@@ -3,7 +3,7 @@
 import { useEffect, useState, FormEvent, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { WFPItem, Department } from '@/types/wfp';
-import { RefreshCw, BarChart2, Plus, X, CheckCircle, AlertCircle, Search, Filter, RotateCcw } from 'lucide-react';
+import { RefreshCw, BarChart2, Plus, X, CheckCircle, AlertCircle, Search, Filter, RotateCcw, Download } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [wfps, setWfps] = useState<WFPItem[]>([]);
@@ -157,6 +157,57 @@ export default function AdminDashboard() {
     });
   }, [wfps, searchQuery, selectedDept, selectedStatus, minBudget, maxBudget]);
 
+  // Export Filtered Table to CSV
+  const handleExportCSV = () => {
+    if (filteredWfps.length === 0) return;
+
+    const headers = [
+      'PPA Title',
+      'Department Code',
+      'Department Name',
+      'AIP Code',
+      'Focal Person',
+      'Allocated Budget (PHP)',
+      'Obligated Budget (PHP)',
+      'Disbursed Budget (PHP)',
+      'BUR Obligation Rate (%)',
+      'Status',
+      'Created Date'
+    ];
+
+    const rows = filteredWfps.map((wfp) => {
+      const allocated = Number(wfp.total_allocated || 0);
+      const obligated = Number(wfp.total_obligated || 0);
+      const disbursed = Number(wfp.total_disbursed || 0);
+      const burRate = allocated > 0 ? ((obligated / allocated) * 100).toFixed(1) : '0';
+
+      return [
+        `"${(wfp.title || '').replace(/"/g, '""')}"`,
+        `"${wfp.departments?.code || ''}"`,
+        `"${(wfp.departments?.name || '').replace(/"/g, '""')}"`,
+        `"${wfp.aip_code || ''}"`,
+        `"${(wfp.profiles?.full_name || 'Unassigned').replace(/"/g, '""')}"`,
+        allocated,
+        obligated,
+        disbursed,
+        `${burRate}%`,
+        `"${wfp.status || ''}"`,
+        `"${wfp.created_at ? new Date(wfp.created_at).toLocaleDateString() : ''}"`
+      ];
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    
+    const timestamp = new Date().toISOString().split('T')[0];
+    link.setAttribute('download', `SDO_Binan_WFP_Report_${timestamp}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const totalAllocated = filteredWfps.reduce((sum: number, w: WFPItem) => sum + Number(w.total_allocated || 0), 0);
   const totalObligated = filteredWfps.reduce((sum: number, w: WFPItem) => sum + Number(w.total_obligated || 0), 0);
   const totalDisbursed = filteredWfps.reduce((sum: number, w: WFPItem) => sum + Number(w.total_disbursed || 0), 0);
@@ -174,6 +225,13 @@ export default function AdminDashboard() {
             <p className="text-xs text-blue-200">Department of Education • Region IV-A CALABARZON</p>
           </div>
           <div className="flex items-center gap-3">
+            <button 
+              onClick={handleExportCSV}
+              disabled={filteredWfps.length === 0}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-3 py-2 rounded-md shadow transition"
+            >
+              <Download className="w-4 h-4" /> Export Report (CSV)
+            </button>
             <button 
               onClick={() => setIsModalOpen(true)}
               className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-bold text-xs px-3.5 py-2 rounded-md shadow transition"
