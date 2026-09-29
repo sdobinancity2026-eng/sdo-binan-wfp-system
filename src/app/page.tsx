@@ -1,15 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { WFPItem, Department } from '@/types/wfp';
-import { CheckCircle, AlertTriangle, Clock, RefreshCw, BarChart2 } from 'lucide-react';
+import { RefreshCw, BarChart2, Plus, X, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [wfps, setWfps] = useState<WFPItem[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  // Form Fields State
+  const [title, setTitle] = useState('');
+  const [aipCode, setAipCode] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
+  const [allocatedBudget, setAllocatedBudget] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -19,11 +31,17 @@ export default function AdminDashboard() {
     setLoading(true);
     
     const { data: deptData } = await supabase.from('departments').select('*');
-    if (deptData) setDepartments(deptData);
+    if (deptData) {
+      setDepartments(deptData);
+      if (deptData.length > 0 && !departmentId) {
+        setDepartmentId(deptData[0].id);
+      }
+    }
 
     const { data: wfpData, error } = await supabase
       .from('wfps')
-      .select('*, departments(code, name), profiles(full_name)');
+      .select('*, departments(code, name), profiles(full_name)')
+      .order('created_at', { ascending: false });
 
     if (!error && wfpData) {
       setWfps(wfpData as WFPItem[]);
@@ -42,11 +60,59 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleCreateWFP(e: FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    setFormSuccess(null);
+
+    if (!title.trim() || !aipCode.trim() || !departmentId || !allocatedBudget) {
+      setFormError('Please fill in all required fields.');
+      return;
+    }
+
+    const budgetValue = parseFloat(allocatedBudget);
+    if (isNaN(budgetValue) || budgetValue <= 0) {
+      setFormError('Please enter a valid allocation budget greater than zero.');
+      return;
+    }
+
+    setSubmitting(true);
+
+    const { error } = await supabase.from('wfps').insert([
+      {
+        title: title.trim(),
+        aip_code: aipCode.trim().toUpperCase(),
+        department_id: departmentId,
+        total_allocated: budgetValue,
+        total_obligated: 0,
+        total_disbursed: 0,
+        status: 'For Review',
+      },
+    ]);
+
+    setSubmitting(false);
+
+    if (error) {
+      setFormError(error.message || 'Failed to submit WFP item.');
+    } else {
+      setFormSuccess('WFP Submission added successfully!');
+      // Reset form fields
+      setTitle('');
+      setAipCode('');
+      setAllocatedBudget('');
+      fetchData();
+      
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setFormSuccess(null);
+      }, 1200);
+    }
+  }
+
   const filteredWfps = selectedDept === 'ALL' 
     ? wfps 
     : wfps.filter((w: WFPItem) => w.department_id === selectedDept);
 
-  // Financial Calculations with Explicit Type Annotations
   const totalAllocated = filteredWfps.reduce((sum: number, w: WFPItem) => sum + Number(w.total_allocated || 0), 0);
   const totalObligated = filteredWfps.reduce((sum: number, w: WFPItem) => sum + Number(w.total_obligated || 0), 0);
   const totalDisbursed = filteredWfps.reduce((sum: number, w: WFPItem) => sum + Number(w.total_disbursed || 0), 0);
@@ -56,18 +122,27 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      {/* Header */}
       <header className="bg-blue-900 text-white shadow-md border-b-4 border-amber-400">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold tracking-wide">SDO BIÑAN CITY — WFP MONITORING PORTAL</h1>
             <p className="text-xs text-blue-200">Department of Education • Region IV-A CALABARZON</p>
           </div>
-          <button 
-            onClick={fetchData}
-            className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 text-xs px-3 py-2 rounded-md font-medium transition"
-          >
-            <RefreshCw className="w-4 h-4" /> Sync Data
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-bold text-xs px-3.5 py-2 rounded-md shadow transition"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" /> Submit New WFP
+            </button>
+            <button 
+              onClick={fetchData}
+              className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 text-xs px-3 py-2 rounded-md font-medium transition"
+            >
+              <RefreshCw className="w-4 h-4" /> Sync Data
+            </button>
+          </div>
         </div>
       </header>
 
@@ -88,6 +163,7 @@ export default function AdminDashboard() {
           </select>
         </div>
 
+        {/* Overview Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <p className="text-xs font-bold text-slate-500 uppercase">Total Allocation</p>
@@ -112,6 +188,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* WFP Table */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
             <h3 className="font-bold text-slate-800">Focal Person WFP Submissions</h3>
@@ -205,6 +282,129 @@ export default function AdminDashboard() {
           )}
         </div>
       </main>
+
+      {/* WFP Submission Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-150">
+            {/* Modal Header */}
+            <div className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center border-b-2 border-amber-400">
+              <div>
+                <h3 className="font-bold text-lg">Submit New WFP Item</h3>
+                <p className="text-xs text-blue-200">Local School Board / Division Work & Financial Plan</p>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="text-blue-200 hover:text-white transition p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleCreateWFP} className="p-6 space-y-4">
+              {formError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {formSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 text-xs flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{formSuccess}</span>
+                </div>
+              )}
+
+              {/* PPA Title */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Program / Project / Activity (PPA) Title *
+                </label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="e.g. ARAL Program Learning Recovery Workshop"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
+                />
+              </div>
+
+              {/* Department & AIP Code Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Department / Division *
+                  </label>
+                  <select
+                    required
+                    value={departmentId}
+                    onChange={(e) => setDepartmentId(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
+                  >
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.code} - {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    AIP Code Alignment *
+                  </label>
+                  <input 
+                    type="text"
+                    required
+                    placeholder="e.g. AIP-2026-CID-001"
+                    value={aipCode}
+                    onChange={(e) => setAipCode(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
+                  />
+                </div>
+              </div>
+
+              {/* Allocated Budget */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Allocated Budget (PHP ₱) *
+                </label>
+                <input 
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  required
+                  placeholder="e.g. 150000"
+                  value={allocatedBudget}
+                  onChange={(e) => setAllocatedBudget(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 flex justify-end gap-3 border-t border-slate-100 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-bold transition disabled:opacity-50"
+                >
+                  {submitting ? 'Submitting...' : 'Submit WFP'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
