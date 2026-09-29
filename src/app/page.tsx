@@ -28,6 +28,11 @@ export default function AdminDashboard() {
   const [aipCode, setAipCode] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [allocatedBudget, setAllocatedBudget] = useState('');
+  const [evidenceOfSuccess, setEvidenceOfSuccess] = useState('');
+  const [kpi, setKpi] = useState('');
+  const [leadingIndicator, setLeadingIndicator] = useState('');
+  const [laggingIndicator, setLaggingIndicator] = useState('');
+  const [target, setTarget] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -93,6 +98,11 @@ export default function AdminDashboard() {
         total_obligated: 0,
         total_disbursed: 0,
         status: 'For Review',
+        evidence_of_success: evidenceOfSuccess.trim(),
+        kpi: kpi.trim(),
+        leading_indicator: leadingIndicator.trim(),
+        lagging_indicator: laggingIndicator.trim(),
+        target: target.trim(),
       },
     ]);
 
@@ -105,6 +115,11 @@ export default function AdminDashboard() {
       setTitle('');
       setAipCode('');
       setAllocatedBudget('');
+      setEvidenceOfSuccess('');
+      setKpi('');
+      setLeadingIndicator('');
+      setLaggingIndicator('');
+      setTarget('');
       fetchData();
       
       setTimeout(() => {
@@ -125,13 +140,14 @@ export default function AdminDashboard() {
   // Filtered WFP Calculation
   const filteredWfps = useMemo(() => {
     return wfps.filter((wfp) => {
-      // 1. Search Query (Title or AIP Code)
+      // 1. Search Query
       if (searchQuery.trim() !== '') {
         const query = searchQuery.toLowerCase();
         const matchesTitle = wfp.title?.toLowerCase().includes(query);
         const matchesAip = wfp.aip_code?.toLowerCase().includes(query);
         const matchesFocal = wfp.profiles?.full_name?.toLowerCase().includes(query);
-        if (!matchesTitle && !matchesAip && !matchesFocal) return false;
+        const matchesKpi = wfp.kpi?.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesAip && !matchesFocal && !matchesKpi) return false;
       }
 
       // 2. Department Filter
@@ -172,6 +188,11 @@ export default function AdminDashboard() {
       'Disbursed Budget (PHP)',
       'BUR Obligation Rate (%)',
       'Status',
+      'Evidence of Success',
+      'KPI',
+      'Leading Indicator',
+      'Lagging Indicator',
+      'Target',
       'Created Date'
     ];
 
@@ -192,6 +213,11 @@ export default function AdminDashboard() {
         disbursed,
         `${burRate}%`,
         `"${wfp.status || ''}"`,
+        `"${(wfp.evidence_of_success || '').replace(/"/g, '""')}"`,
+        `"${(wfp.kpi || '').replace(/"/g, '""')}"`,
+        `"${(wfp.leading_indicator || '').replace(/"/g, '""')}"`,
+        `"${(wfp.lagging_indicator || '').replace(/"/g, '""')}"`,
+        `"${(wfp.target || '').replace(/"/g, '""')}"`,
         `"${wfp.created_at ? new Date(wfp.created_at).toLocaleDateString() : ''}"`
       ];
     });
@@ -292,7 +318,7 @@ export default function AdminDashboard() {
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input 
                 type="text"
-                placeholder="Search by PPA title or AIP code..."
+                placeholder="Search by PPA title, AIP code, or KPI..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
@@ -372,7 +398,7 @@ export default function AdminDashboard() {
             <div className="p-8 text-center text-slate-500">Loading WFP records...</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-50 text-slate-600 font-semibold border-b">
                   <tr>
                     <th className="p-4">Program / Activity (PPA)</th>
@@ -381,13 +407,18 @@ export default function AdminDashboard() {
                     <th className="p-4">Allocation</th>
                     <th className="p-4">Obligation Rate</th>
                     <th className="p-4">Status</th>
+                    <th className="p-4">Evidence of Success</th>
+                    <th className="p-4">KPI</th>
+                    <th className="p-4">Leading Indicator</th>
+                    <th className="p-4">Lagging Indicator</th>
+                    <th className="p-4">Target</th>
                     <th className="p-4 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredWfps.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-6 text-center text-slate-400">
+                      <td colSpan={12} className="p-6 text-center text-slate-400">
                         No WFP records match your current filter criteria.
                       </td>
                     </tr>
@@ -429,6 +460,11 @@ export default function AdminDashboard() {
                               {wfp.status}
                             </span>
                           </td>
+                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.evidence_of_success || '-'}</td>
+                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.kpi || '-'}</td>
+                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.leading_indicator || '-'}</td>
+                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.lagging_indicator || '-'}</td>
+                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.target || '-'}</td>
                           <td className="p-4 text-center">
                             <div className="flex justify-center gap-1">
                               <button 
@@ -458,8 +494,8 @@ export default function AdminDashboard() {
 
       {/* WFP Submission Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl my-8 overflow-hidden animate-in fade-in zoom-in duration-150">
             <div className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center border-b-2 border-amber-400">
               <div>
                 <h3 className="font-bold text-lg">Submit New WFP Item</h3>
@@ -473,7 +509,7 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateWFP} className="p-6 space-y-4">
+            <form onSubmit={handleCreateWFP} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               {formError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -550,6 +586,63 @@ export default function AdminDashboard() {
                   onChange={(e) => setAllocatedBudget(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
                 />
+              </div>
+
+              {/* Indicator Fields */}
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-xs font-bold text-blue-900 uppercase mb-3">Performance Indicators & Monitoring</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Evidence of Success</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Activity Completion Report"
+                      value={evidenceOfSuccess}
+                      onChange={(e) => setEvidenceOfSuccess(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Key Performance Indicator (KPI)</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. % of participants trained"
+                      value={kpi}
+                      onChange={(e) => setKpi(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Leading Indicator</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Module pre-test scores"
+                      value={leadingIndicator}
+                      onChange={(e) => setLeadingIndicator(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Lagging Indicator</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Annual reading literacy rate"
+                      value={laggingIndicator}
+                      onChange={(e) => setLaggingIndicator(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Target</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g. 100% of target teachers proficient"
+                    value={target}
+                    onChange={(e) => setTarget(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
+                  />
+                </div>
               </div>
 
               <div className="pt-3 flex justify-end gap-3 border-t border-slate-100 mt-6">

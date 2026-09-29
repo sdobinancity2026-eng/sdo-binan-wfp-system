@@ -17,6 +17,11 @@ export interface WFPItem {
   total_obligated: number;
   total_disbursed: number;
   status: 'For Review' | 'Approved' | 'Needs Revision' | string;
+  evidence_of_success?: string;
+  kpi?: string;
+  leading_indicator?: string;
+  lagging_indicator?: string;
+  target?: string;
   created_at?: string;
   updated_at?: string;
   departments?: Department;
