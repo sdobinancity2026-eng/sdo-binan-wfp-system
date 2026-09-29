@@ -47,56 +47,53 @@ export default function AdminDashboard() {
     checkSessionAndFetchData();
   }, []);
 
-  async function checkSessionAndFetchData() {
-    setLoading(true);
+  // Replace the checkSessionAndFetchData function in src/app/page.tsx with this:
+async function checkSessionAndFetchData() {
+  setLoading(true);
 
-    // 1. Get current user session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      setCurrentUser(session.user);
-      
-      // Fetch role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profile) {
-        setUserRole(profile.role);
-      }
-    } else {
-      setCurrentUser(null);
-      setUserRole(null);
+  // 1. Check custom admin session in localStorage
+  const savedSession = localStorage.getItem('sdo_admin_session');
+  if (savedSession) {
+    try {
+      const adminData = JSON.parse(savedSession);
+      setCurrentUser(adminData);
+      setUserRole('admin');
+    } catch (e) {
+      localStorage.removeItem('sdo_admin_session');
     }
-
-    // 2. Fetch departments
-    const { data: deptData } = await supabase.from('departments').select('*');
-    if (deptData) {
-      setDepartments(deptData);
-      if (deptData.length > 0 && !departmentId) {
-        setDepartmentId(deptData[0].id);
-      }
-    }
-
-    // 3. Fetch WFPs
-    const { data: wfpData, error } = await supabase
-      .from('wfps')
-      .select('*, departments(code, name), profiles(full_name)')
-      .order('created_at', { ascending: false });
-
-    if (!error && wfpData) {
-      setWfps(wfpData as WFPItem[]);
-    }
-    setLoading(false);
-  }
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
+  } else {
     setCurrentUser(null);
     setUserRole(null);
-    router.refresh();
   }
+
+  // 2. Fetch departments
+  const { data: deptData } = await supabase.from('departments').select('*');
+  if (deptData) {
+    setDepartments(deptData);
+    if (deptData.length > 0 && !departmentId) {
+      setDepartmentId(deptData[0].id);
+    }
+  }
+
+  // 3. Fetch WFPs
+  const { data: wfpData, error } = await supabase
+    .from('wfps')
+    .select('*, departments(code, name)')
+    .order('created_at', { ascending: false });
+
+  if (!error && wfpData) {
+    setWfps(wfpData as WFPItem[]);
+  }
+  setLoading(false);
+}
+
+// Update sign out logic
+function handleSignOut() {
+  localStorage.removeItem('sdo_admin_session');
+  setCurrentUser(null);
+  setUserRole(null);
+  router.refresh();
+}
 
   async function handleStatusChange(id: string, newStatus: string) {
     if (userRole !== 'admin') {
