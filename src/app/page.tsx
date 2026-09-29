@@ -3,7 +3,7 @@
 import { useEffect, useState, FormEvent, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { WFPItem, Department } from '@/types/wfp';
-import { RefreshCw, BarChart2, Plus, X, CheckCircle, AlertCircle, Search, Filter, RotateCcw, Download } from 'lucide-react';
+import { RefreshCw, BarChart2, Plus, X, CheckCircle, AlertCircle, Search, Filter, RotateCcw, Download, CheckCircle2, Clock, FileText, ChevronRight, AlertTriangle } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [wfps, setWfps] = useState<WFPItem[]>([]);
@@ -17,11 +17,14 @@ export default function AdminDashboard() {
   const [minBudget, setMinBudget] = useState<string>('');
   const [maxBudget, setMaxBudget] = useState<string>('');
 
-  // Modal State
+  // Submit Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  // Tracking Modal State
+  const [selectedWfpForTracking, setSelectedWfpForTracking] = useState<WFPItem | null>(null);
 
   // Form Fields State
   const [title, setTitle] = useState('');
@@ -68,6 +71,9 @@ export default function AdminDashboard() {
 
     if (!error) {
       fetchData();
+      if (selectedWfpForTracking && selectedWfpForTracking.id === id) {
+        setSelectedWfpForTracking((prev) => prev ? { ...prev, status: newStatus } : null);
+      }
     }
   }
 
@@ -137,10 +143,8 @@ export default function AdminDashboard() {
     setMaxBudget('');
   };
 
-  // Filtered WFP Calculation
   const filteredWfps = useMemo(() => {
     return wfps.filter((wfp) => {
-      // 1. Search Query
       if (searchQuery.trim() !== '') {
         const query = searchQuery.toLowerCase();
         const matchesTitle = wfp.title?.toLowerCase().includes(query);
@@ -150,17 +154,14 @@ export default function AdminDashboard() {
         if (!matchesTitle && !matchesAip && !matchesFocal && !matchesKpi) return false;
       }
 
-      // 2. Department Filter
       if (selectedDept !== 'ALL' && wfp.department_id !== selectedDept) {
         return false;
       }
 
-      // 3. Status Filter
       if (selectedStatus !== 'ALL' && wfp.status !== selectedStatus) {
         return false;
       }
 
-      // 4. Budget Range Filter
       const budget = Number(wfp.total_allocated || 0);
       if (minBudget !== '' && budget < parseFloat(minBudget)) {
         return false;
@@ -173,7 +174,6 @@ export default function AdminDashboard() {
     });
   }, [wfps, searchQuery, selectedDept, selectedStatus, minBudget, maxBudget]);
 
-  // Export Filtered Table to CSV
   const handleExportCSV = () => {
     if (filteredWfps.length === 0) return;
 
@@ -240,6 +240,52 @@ export default function AdminDashboard() {
 
   const burObligation = totalAllocated > 0 ? ((totalObligated / totalAllocated) * 100).toFixed(1) : '0';
   const burDisbursement = totalObligated > 0 ? ((totalDisbursed / totalObligated) * 100).toFixed(1) : '0';
+
+  // Helper for tracking steps
+  const getTimelineSteps = (status: string) => {
+    const isNeedsRevision = status === 'Needs Revision';
+    const isApproved = status === 'Approved';
+
+    return [
+      {
+        id: 1,
+        title: 'Draft Submitted',
+        description: 'WFP Proposal submitted by Focal Person',
+        completed: true,
+        current: false,
+      },
+      {
+        id: 2,
+        title: 'Division Review',
+        description: 'Under review by Section Chief & Admin',
+        completed: isApproved || status === 'For Review' || isNeedsRevision,
+        current: status === 'For Review',
+        failed: isNeedsRevision,
+        failedMsg: 'Returned for Revision'
+      },
+      {
+        id: 3,
+        title: 'AIP & Budget Verification',
+        description: 'Checked against Annual Implementation Plan & Local School Board Budget',
+        completed: isApproved,
+        current: false,
+      },
+      {
+        id: 4,
+        title: 'Superintendent Final Approval',
+        description: 'Signed & Approved by Division Schools Superintendent',
+        completed: isApproved,
+        current: false,
+      },
+      {
+        id: 5,
+        title: 'Obligation & Disbursement',
+        description: 'Implementation phase & financial liquidation',
+        completed: isApproved && Number(selectedWfpForTracking?.total_disbursed || 0) > 0,
+        current: isApproved && Number(selectedWfpForTracking?.total_disbursed || 0) === 0,
+      }
+    ];
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -313,7 +359,6 @@ export default function AdminDashboard() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-            {/* Keyword Search */}
             <div className="md:col-span-4 relative">
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input 
@@ -325,7 +370,6 @@ export default function AdminDashboard() {
               />
             </div>
 
-            {/* Department Selector */}
             <div className="md:col-span-3">
               <select 
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
@@ -339,7 +383,6 @@ export default function AdminDashboard() {
               </select>
             </div>
 
-            {/* Status Filter */}
             <div className="md:col-span-2">
               <select 
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
@@ -353,7 +396,6 @@ export default function AdminDashboard() {
               </select>
             </div>
 
-            {/* Budget Range Inputs */}
             <div className="md:col-span-2 flex items-center gap-1.5">
               <input 
                 type="number"
@@ -372,7 +414,6 @@ export default function AdminDashboard() {
               />
             </div>
 
-            {/* Reset Button */}
             <div className="md:col-span-1 flex justify-end">
               <button
                 onClick={resetFilters}
@@ -429,10 +470,17 @@ export default function AdminDashboard() {
                         : 0;
 
                       return (
-                        <tr key={wfp.id} className="hover:bg-slate-50">
+                        <tr key={wfp.id} className="hover:bg-slate-50 transition">
                           <td className="p-4">
-                            <p className="font-semibold text-slate-800">{wfp.title}</p>
-                            <p className="text-xs text-slate-500">Focal: {wfp.profiles?.full_name || 'Unassigned'}</p>
+                            <button
+                              onClick={() => setSelectedWfpForTracking(wfp)}
+                              className="text-left group focus:outline-none"
+                            >
+                              <p className="font-bold text-blue-900 group-hover:text-amber-600 group-hover:underline flex items-center gap-1.5 transition">
+                                {wfp.title} <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-600" />
+                              </p>
+                              <p className="text-xs text-slate-500">Focal: {wfp.profiles?.full_name || 'Unassigned'} • <span className="text-amber-600 font-semibold hover:underline">Track Submission</span></p>
+                            </button>
                           </td>
                           <td className="p-4 font-medium text-slate-700">{wfp.departments?.code || '-'}</td>
                           <td className="p-4">
@@ -491,6 +539,130 @@ export default function AdminDashboard() {
           )}
         </div>
       </main>
+
+      {/* Shopee-style Tracking Modal */}
+      {selectedWfpForTracking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
+            {/* Shopee Header */}
+            <div className="bg-gradient-to-r from-orange-600 to-amber-500 text-white px-6 py-4 flex justify-between items-center shadow-md">
+              <div className="flex items-center gap-2">
+                <FileText className="w-6 h-6" />
+                <div>
+                  <h3 className="font-extrabold text-base tracking-wide">WFP SUBMISSION TRACKER</h3>
+                  <p className="text-xs text-amber-100">Ref ID: {selectedWfpForTracking.id.substring(0, 8).toUpperCase()}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedWfpForTracking(null)}
+                className="bg-white/20 hover:bg-white/30 text-white transition p-1.5 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 bg-slate-50 space-y-6 max-h-[80vh] overflow-y-auto">
+              {/* Product Info Card */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-900 px-2 py-0.5 rounded">
+                    {selectedWfpForTracking.departments?.code || 'SDO'} Department
+                  </span>
+                  <h4 className="font-bold text-slate-800 text-base mt-1.5">{selectedWfpForTracking.title}</h4>
+                  <p className="text-xs text-slate-500 mt-1">AIP Code: <span className="font-semibold text-slate-700">{selectedWfpForTracking.aip_code}</span></p>
+                  <p className="text-xs text-slate-500">Focal: <span className="font-semibold text-slate-700">{selectedWfpForTracking.profiles?.full_name || 'Unassigned'}</span></p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-slate-400 uppercase">Allocated Budget</p>
+                  <p className="text-lg font-black text-emerald-700 mt-0.5">₱{Number(selectedWfpForTracking.total_allocated).toLocaleString()}</p>
+                  <span className={`inline-block text-[11px] font-extrabold px-2.5 py-0.5 rounded-md mt-2 ${
+                    selectedWfpForTracking.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                    selectedWfpForTracking.status === 'For Review' ? 'bg-amber-100 text-amber-800' :
+                    'bg-rose-100 text-rose-800'
+                  }`}>
+                    {selectedWfpForTracking.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Stepper Line */}
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <h5 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-6 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-orange-500" /> Submission Progress Timeline
+                </h5>
+
+                <div className="relative pl-6 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                  {getTimelineSteps(selectedWfpForTracking.status).map((step) => {
+                    return (
+                      <div key={step.id} className="relative flex items-start gap-4 group">
+                        {/* Status Icon Marker */}
+                        <div className={`absolute -left-6 top-0.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ring-4 ring-white ${
+                          step.failed
+                            ? 'bg-rose-600 text-white'
+                            : step.completed
+                            ? 'bg-orange-500 text-white'
+                            : step.current
+                            ? 'bg-amber-500 text-white animate-pulse'
+                            : 'bg-slate-200 text-slate-500'
+                        }`}>
+                          {step.failed ? (
+                            <X className="w-3.5 h-3.5 stroke-[3]" />
+                          ) : step.completed ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />
+                          ) : (
+                            step.id
+                          )}
+                        </div>
+
+                        {/* Step Description */}
+                        <div className="flex-1">
+                          <div className="flex justify-between items-baseline">
+                            <h6 className={`text-sm font-bold ${
+                              step.failed ? 'text-rose-600' : step.completed || step.current ? 'text-slate-800' : 'text-slate-400'
+                            }`}>
+                              {step.title}
+                            </h6>
+                            {step.current && (
+                              <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">
+                                Current Status
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">{step.description}</p>
+                          {step.failed && (
+                            <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-xs text-rose-700 font-semibold flex items-center gap-1.5">
+                              <AlertTriangle className="w-4 h-4 text-rose-600" /> {step.failedMsg}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Buttons inside Tracker */}
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-xs text-slate-500">Submitted Date: {selectedWfpForTracking.created_at ? new Date(selectedWfpForTracking.created_at).toLocaleDateString() : 'N/A'}</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleStatusChange(selectedWfpForTracking.id, 'Approved')}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
+                  >
+                    Mark Approved
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange(selectedWfpForTracking.id, 'Needs Revision')}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
+                  >
+                    Request Revision
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* WFP Submission Modal */}
       {isModalOpen && (
