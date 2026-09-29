@@ -18,11 +18,9 @@ export default function AdminDashboard() {
   async function fetchData() {
     setLoading(true);
     
-    // Fetch Departments
     const { data: deptData } = await supabase.from('departments').select('*');
     if (deptData) setDepartments(deptData);
 
-    // Fetch WFPs with joined profiles and departments
     const { data: wfpData, error } = await supabase
       .from('wfps')
       .select('*, departments(code, name), profiles(full_name)');
@@ -46,19 +44,18 @@ export default function AdminDashboard() {
 
   const filteredWfps = selectedDept === 'ALL' 
     ? wfps 
-    : wfps.filter(w => w.department_id === selectedDept);
+    : wfps.filter((w: WFPItem) => w.department_id === selectedDept);
 
-  // Key Financial Calculations
-  const totalAllocated = filteredWfps.reduce((sum, w) => sum + Number(w.total_allocated || 0), 0);
-  const totalObligated = filteredWfps.reduce((sum, w) => sum + Number(w.total_obligated || 0), 0);
-  const totalDisbursed = filteredWfps.reduce((sum, w) => sum + Number(w.total_disbursed || 0), 0);
+  // Financial Calculations with Explicit Type Annotations
+  const totalAllocated = filteredWfps.reduce((sum: number, w: WFPItem) => sum + Number(w.total_allocated || 0), 0);
+  const totalObligated = filteredWfps.reduce((sum: number, w: WFPItem) => sum + Number(w.total_obligated || 0), 0);
+  const totalDisbursed = filteredWfps.reduce((sum: number, w: WFPItem) => sum + Number(w.total_disbursed || 0), 0);
 
   const burObligation = totalAllocated > 0 ? ((totalObligated / totalAllocated) * 100).toFixed(1) : '0';
   const burDisbursement = totalObligated > 0 ? ((totalDisbursed / totalObligated) * 100).toFixed(1) : '0';
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* DepEd Header */}
       <header className="bg-blue-900 text-white shadow-md border-b-4 border-amber-400">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
@@ -75,7 +72,6 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Department Filter */}
         <div className="mb-6 flex justify-between items-center">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <BarChart2 className="w-5 h-5 text-blue-900" /> Executive Overview
@@ -92,7 +88,6 @@ export default function AdminDashboard() {
           </select>
         </div>
 
-        {/* Financial Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <p className="text-xs font-bold text-slate-500 uppercase">Total Allocation</p>
@@ -111,13 +106,12 @@ export default function AdminDashboard() {
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <p className="text-xs font-bold text-slate-500 uppercase">Pending Review</p>
             <p className="text-2xl font-black text-amber-600 mt-1">
-              {filteredWfps.filter(w => w.status === 'For Review').length}
+              {filteredWfps.filter((w: WFPItem) => w.status === 'For Review').length}
             </p>
             <p className="text-xs text-slate-500 mt-1">Requires Admin Action</p>
           </div>
         </div>
 
-        {/* WFP Master List */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
             <h3 className="font-bold text-slate-800">Focal Person WFP Submissions</h3>
@@ -148,7 +142,7 @@ export default function AdminDashboard() {
                       <td colSpan={7} className="p-6 text-center text-slate-400">No WFP records found.</td>
                     </tr>
                   ) : (
-                    filteredWfps.map(wfp => {
+                    filteredWfps.map((wfp: WFPItem) => {
                       const oblRate = wfp.total_allocated > 0 
                         ? ((wfp.total_obligated / wfp.total_allocated) * 100).toFixed(0) 
                         : 0;
@@ -190,14 +184,12 @@ export default function AdminDashboard() {
                               <button 
                                 onClick={() => handleStatusChange(wfp.id, 'Approved')}
                                 className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold"
-                                title="Approve WFP"
                               >
                                 Approve
                               </button>
                               <button 
                                 onClick={() => handleStatusChange(wfp.id, 'Needs Revision')}
                                 className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold"
-                                title="Return for Revision"
                               >
                                 Revise
                               </button>
