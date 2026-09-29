@@ -1,14 +1,20 @@
 'use client';
 
 import { useEffect, useState, FormEvent, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { WFPItem, Department } from '@/types/wfp';
-import { RefreshCw, BarChart2, Plus, X, CheckCircle, AlertCircle, Search, Filter, RotateCcw, Download, CheckCircle2, Clock, FileText, ChevronRight, AlertTriangle } from 'lucide-react';
+import { RefreshCw, BarChart2, Plus, X, CheckCircle, AlertCircle, Search, Filter, RotateCcw, Download, CheckCircle2, Clock, FileText, ChevronRight, AlertTriangle, LogOut, ShieldAlert, UserCheck } from 'lucide-react';
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [wfps, setWfps] = useState<WFPItem[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // User Auth & Role State
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,12 +44,33 @@ export default function AdminDashboard() {
   const [target, setTarget] = useState('');
 
   useEffect(() => {
-    fetchData();
+    checkSessionAndFetchData();
   }, []);
 
-  async function fetchData() {
+  async function checkSessionAndFetchData() {
     setLoading(true);
-    
+
+    // 1. Get current user session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      setCurrentUser(session.user);
+      
+      // Fetch role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile) {
+        setUserRole(profile.role);
+      }
+    } else {
+      setCurrentUser(null);
+      setUserRole(null);
+    }
+
+    // 2. Fetch departments
     const { data: deptData } = await supabase.from('departments').select('*');
     if (deptData) {
       setDepartments(deptData);
@@ -52,6 +79,7 @@ export default function AdminDashboard() {
       }
     }
 
+    // 3. Fetch WFPs
     const { data: wfpData, error } = await supabase
       .from('wfps')
       .select('*, departments(code, name), profiles(full_name)')
@@ -63,14 +91,28 @@ export default function AdminDashboard() {
     setLoading(false);
   }
 
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    setUserRole(null);
+    router.refresh();
+  }
+
   async function handleStatusChange(id: string, newStatus: string) {
+    if (userRole !== 'admin') {
+      alert('Unauthorized Action: Only Division Administrators can approve or update submission statuses.');
+      return;
+    }
+
     const { error } = await supabase
       .from('wfps')
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (!error) {
-      fetchData();
+    if (error) {
+      alert(`Update failed: ${error.message}`);
+    } else {
+      checkSessionAndFetchData();
       if (selectedWfpForTracking && selectedWfpForTracking.id === id) {
         setSelectedWfpForTracking((prev) => prev ? { ...prev, status: newStatus } : null);
       }
@@ -109,6 +151,7 @@ export default function AdminDashboard() {
         leading_indicator: leadingIndicator.trim(),
         lagging_indicator: laggingIndicator.trim(),
         target: target.trim(),
+        user_id: currentUser?.id || null,
       },
     ]);
 
@@ -126,7 +169,7 @@ export default function AdminDashboard() {
       setLeadingIndicator('');
       setLaggingIndicator('');
       setTarget('');
-      fetchData();
+      checkSessionAndFetchData();
       
       setTimeout(() => {
         setIsModalOpen(false);
@@ -178,22 +221,10 @@ export default function AdminDashboard() {
     if (filteredWfps.length === 0) return;
 
     const headers = [
-      'PPA Title',
-      'Department Code',
-      'Department Name',
-      'AIP Code',
-      'Focal Person',
-      'Allocated Budget (PHP)',
-      'Obligated Budget (PHP)',
-      'Disbursed Budget (PHP)',
-      'BUR Obligation Rate (%)',
-      'Status',
-      'Evidence of Success',
-      'KPI',
-      'Leading Indicator',
-      'Lagging Indicator',
-      'Target',
-      'Created Date'
+      'PPA Title', 'Department Code', 'Department Name', 'AIP Code',
+      'Focal Person', 'Allocated Budget (PHP)', 'Obligated Budget (PHP)',
+      'Disbursed Budget (PHP)', 'BUR Obligation Rate (%)', 'Status',
+      'Evidence of Success', 'KPI', 'Leading Indicator', 'Lagging Indicator', 'Target', 'Created Date'
     ];
 
     const rows = filteredWfps.map((wfp) => {
@@ -208,10 +239,7 @@ export default function AdminDashboard() {
         `"${(wfp.departments?.name || '').replace(/"/g, '""')}"`,
         `"${wfp.aip_code || ''}"`,
         `"${(wfp.profiles?.full_name || 'Unassigned').replace(/"/g, '""')}"`,
-        allocated,
-        obligated,
-        disbursed,
-        `${burRate}%`,
+        allocated, obligated, disbursed, `${burRate}%`,
         `"${wfp.status || ''}"`,
         `"${(wfp.evidence_of_success || '').replace(/"/g, '""')}"`,
         `"${(wfp.kpi || '').replace(/"/g, '""')}"`,
@@ -241,49 +269,16 @@ export default function AdminDashboard() {
   const burObligation = totalAllocated > 0 ? ((totalObligated / totalAllocated) * 100).toFixed(1) : '0';
   const burDisbursement = totalObligated > 0 ? ((totalDisbursed / totalObligated) * 100).toFixed(1) : '0';
 
-  // Helper for tracking steps
   const getTimelineSteps = (status: string) => {
     const isNeedsRevision = status === 'Needs Revision';
     const isApproved = status === 'Approved';
 
     return [
-      {
-        id: 1,
-        title: 'Draft Submitted',
-        description: 'WFP Proposal submitted by Focal Person',
-        completed: true,
-        current: false,
-      },
-      {
-        id: 2,
-        title: 'Division Review',
-        description: 'Under review by Section Chief & Admin',
-        completed: isApproved || status === 'For Review' || isNeedsRevision,
-        current: status === 'For Review',
-        failed: isNeedsRevision,
-        failedMsg: 'Returned for Revision'
-      },
-      {
-        id: 3,
-        title: 'AIP & Budget Verification',
-        description: 'Checked against Annual Implementation Plan & Local School Board Budget',
-        completed: isApproved,
-        current: false,
-      },
-      {
-        id: 4,
-        title: 'Superintendent Final Approval',
-        description: 'Signed & Approved by Division Schools Superintendent',
-        completed: isApproved,
-        current: false,
-      },
-      {
-        id: 5,
-        title: 'Obligation & Disbursement',
-        description: 'Implementation phase & financial liquidation',
-        completed: isApproved && Number(selectedWfpForTracking?.total_disbursed || 0) > 0,
-        current: isApproved && Number(selectedWfpForTracking?.total_disbursed || 0) === 0,
-      }
+      { id: 1, title: 'Draft Submitted', description: 'WFP Proposal submitted by Focal Person', completed: true, current: false },
+      { id: 2, title: 'Division Review', description: 'Under review by Section Chief & Admin', completed: isApproved || status === 'For Review' || isNeedsRevision, current: status === 'For Review', failed: isNeedsRevision, failedMsg: 'Returned for Revision' },
+      { id: 3, title: 'AIP & Budget Verification', description: 'Checked against Annual Implementation Plan & Local School Board Budget', completed: isApproved, current: false },
+      { id: 4, title: 'Superintendent Final Approval', description: 'Signed & Approved by Division Schools Superintendent', completed: isApproved, current: false },
+      { id: 5, title: 'Obligation & Disbursement', description: 'Implementation phase & financial liquidation', completed: isApproved && Number(selectedWfpForTracking?.total_disbursed || 0) > 0, current: isApproved && Number(selectedWfpForTracking?.total_disbursed || 0) === 0 }
     ];
   };
 
@@ -297,30 +292,74 @@ export default function AdminDashboard() {
             <p className="text-xs text-blue-200">Department of Education • Region IV-A CALABARZON</p>
           </div>
           <div className="flex items-center gap-3">
+            {currentUser ? (
+              <div className="flex items-center gap-3 bg-blue-950 px-3 py-1.5 rounded-lg border border-blue-800">
+                <div className="text-right">
+                  <p className="text-xs font-bold text-amber-400 flex items-center justify-end gap-1">
+                    <UserCheck className="w-3.5 h-3.5" /> {currentUser.email}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-blue-300 font-bold">
+                    Role: <span className="text-emerald-400">{userRole || 'Admin'}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  title="Sign Out"
+                  className="bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded transition"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => router.push('/login')}
+                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-bold text-xs px-3.5 py-2 rounded-md shadow transition"
+              >
+                Admin Sign In
+              </button>
+            )}
+
             <button 
               onClick={handleExportCSV}
               disabled={filteredWfps.length === 0}
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-3 py-2 rounded-md shadow transition"
             >
-              <Download className="w-4 h-4" /> Export Report (CSV)
+              <Download className="w-4 h-4" /> Export CSV
             </button>
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-bold text-xs px-3.5 py-2 rounded-md shadow transition"
+              className="flex items-center gap-1.5 bg-blue-800 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-md shadow transition border border-blue-700"
             >
-              <Plus className="w-4 h-4 stroke-[3]" /> Submit New WFP
+              <Plus className="w-4 h-4 stroke-[3]" /> Submit WFP
             </button>
             <button 
-              onClick={fetchData}
+              onClick={checkSessionAndFetchData}
               className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 text-xs px-3 py-2 rounded-md font-medium transition"
             >
-              <RefreshCw className="w-4 h-4" /> Sync Data
+              <RefreshCw className="w-4 h-4" /> Sync
             </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {!currentUser && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
+              <span>
+                <strong>Public View Mode:</strong> You are currently viewing public WFP tracking data. Only authenticated <strong>Division Administrators</strong> can approve or revise submission statuses.
+              </span>
+            </div>
+            <button
+              onClick={() => router.push('/login')}
+              className="px-3 py-1.5 bg-amber-600 text-white rounded font-bold text-xs hover:bg-amber-700 transition"
+            >
+              Admin Login
+            </button>
+          </div>
+        )}
+
         <div className="mb-6 flex justify-between items-center">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <BarChart2 className="w-5 h-5 text-blue-900" /> Executive Overview
@@ -352,7 +391,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Filter & Search Bar */}
+        {/* Filter Bar */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
           <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100 text-xs font-bold text-slate-700 uppercase tracking-wider">
             <Filter className="w-4 h-4 text-blue-900" /> Search & Filter Submissions
@@ -417,7 +456,6 @@ export default function AdminDashboard() {
             <div className="md:col-span-1 flex justify-end">
               <button
                 onClick={resetFilters}
-                title="Reset Filters"
                 className="w-full flex items-center justify-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition"
               >
                 <RotateCcw className="w-3.5 h-3.5" /> Reset
@@ -453,7 +491,7 @@ export default function AdminDashboard() {
                     <th className="p-4">Leading Indicator</th>
                     <th className="p-4">Lagging Indicator</th>
                     <th className="p-4">Target</th>
-                    <th className="p-4 text-center">Action</th>
+                    <th className="p-4 text-center">Admin Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -514,20 +552,24 @@ export default function AdminDashboard() {
                           <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.lagging_indicator || '-'}</td>
                           <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.target || '-'}</td>
                           <td className="p-4 text-center">
-                            <div className="flex justify-center gap-1">
-                              <button 
-                                onClick={() => handleStatusChange(wfp.id, 'Approved')}
-                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold"
-                              >
-                                Approve
-                              </button>
-                              <button 
-                                onClick={() => handleStatusChange(wfp.id, 'Needs Revision')}
-                                className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold"
-                              >
-                                Revise
-                              </button>
-                            </div>
+                            {userRole === 'admin' ? (
+                              <div className="flex justify-center gap-1">
+                                <button 
+                                  onClick={() => handleStatusChange(wfp.id, 'Approved')}
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold shadow-sm transition"
+                                >
+                                  Approve
+                                </button>
+                                <button 
+                                  onClick={() => handleStatusChange(wfp.id, 'Needs Revision')}
+                                  className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold shadow-sm transition"
+                                >
+                                  Revise
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">Admin Login Required</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -544,7 +586,6 @@ export default function AdminDashboard() {
       {selectedWfpForTracking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
-            {/* Shopee Header */}
             <div className="bg-gradient-to-r from-orange-600 to-amber-500 text-white px-6 py-4 flex justify-between items-center shadow-md">
               <div className="flex items-center gap-2">
                 <FileText className="w-6 h-6" />
@@ -562,7 +603,6 @@ export default function AdminDashboard() {
             </div>
 
             <div className="p-6 bg-slate-50 space-y-6 max-h-[80vh] overflow-y-auto">
-              {/* Product Info Card */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-start">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-900 px-2 py-0.5 rounded">
@@ -585,79 +625,75 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Progress Stepper Line */}
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                 <h5 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-6 flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-orange-500" /> Submission Progress Timeline
                 </h5>
 
                 <div className="relative pl-6 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-                  {getTimelineSteps(selectedWfpForTracking.status).map((step) => {
-                    return (
-                      <div key={step.id} className="relative flex items-start gap-4 group">
-                        {/* Status Icon Marker */}
-                        <div className={`absolute -left-6 top-0.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ring-4 ring-white ${
-                          step.failed
-                            ? 'bg-rose-600 text-white'
-                            : step.completed
-                            ? 'bg-orange-500 text-white'
-                            : step.current
-                            ? 'bg-amber-500 text-white animate-pulse'
-                            : 'bg-slate-200 text-slate-500'
-                        }`}>
-                          {step.failed ? (
-                            <X className="w-3.5 h-3.5 stroke-[3]" />
-                          ) : step.completed ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />
-                          ) : (
-                            step.id
-                          )}
-                        </div>
-
-                        {/* Step Description */}
-                        <div className="flex-1">
-                          <div className="flex justify-between items-baseline">
-                            <h6 className={`text-sm font-bold ${
-                              step.failed ? 'text-rose-600' : step.completed || step.current ? 'text-slate-800' : 'text-slate-400'
-                            }`}>
-                              {step.title}
-                            </h6>
-                            {step.current && (
-                              <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">
-                                Current Status
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-500 mt-0.5">{step.description}</p>
-                          {step.failed && (
-                            <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-xs text-rose-700 font-semibold flex items-center gap-1.5">
-                              <AlertTriangle className="w-4 h-4 text-rose-600" /> {step.failedMsg}
-                            </div>
-                          )}
-                        </div>
+                  {getTimelineSteps(selectedWfpForTracking.status).map((step) => (
+                    <div key={step.id} className="relative flex items-start gap-4 group">
+                      <div className={`absolute -left-6 top-0.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ring-4 ring-white ${
+                        step.failed
+                          ? 'bg-rose-600 text-white'
+                          : step.completed
+                          ? 'bg-orange-500 text-white'
+                          : step.current
+                          ? 'bg-amber-500 text-white animate-pulse'
+                          : 'bg-slate-200 text-slate-500'
+                      }`}>
+                        {step.failed ? <X className="w-3.5 h-3.5 stroke-[3]" /> : step.completed ? <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" /> : step.id}
                       </div>
-                    );
-                  })}
+
+                      <div className="flex-1">
+                        <div className="flex justify-between items-baseline">
+                          <h6 className={`text-sm font-bold ${
+                            step.failed ? 'text-rose-600' : step.completed || step.current ? 'text-slate-800' : 'text-slate-400'
+                          }`}>
+                            {step.title}
+                          </h6>
+                          {step.current && (
+                            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">
+                              Current Status
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">{step.description}</p>
+                        {step.failed && (
+                          <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded text-xs text-rose-700 font-semibold flex items-center gap-1.5">
+                            <AlertTriangle className="w-4 h-4 text-rose-600" /> {step.failedMsg}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Action Buttons inside Tracker */}
+              {/* Action Buttons protected by role */}
               <div className="flex justify-between items-center pt-2">
                 <span className="text-xs text-slate-500">Submitted Date: {selectedWfpForTracking.created_at ? new Date(selectedWfpForTracking.created_at).toLocaleDateString() : 'N/A'}</span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleStatusChange(selectedWfpForTracking.id, 'Approved')}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
-                  >
-                    Mark Approved
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(selectedWfpForTracking.id, 'Needs Revision')}
-                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
-                  >
-                    Request Revision
-                  </button>
-                </div>
+                
+                {userRole === 'admin' ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleStatusChange(selectedWfpForTracking.id, 'Approved')}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
+                    >
+                      Mark Approved
+                    </button>
+                    <button
+                      onClick={() => handleStatusChange(selectedWfpForTracking.id, 'Needs Revision')}
+                      className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
+                    >
+                      Request Revision
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs bg-slate-200 text-slate-600 px-3 py-1 rounded font-semibold">
+                    Viewing as Guest / Focal Person
+                  </span>
+                )}
               </div>
             </div>
           </div>
