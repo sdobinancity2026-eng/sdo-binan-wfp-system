@@ -285,75 +285,75 @@ function handleSignOut() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-   {/* Header */}
-<header className="bg-blue-900 text-white shadow-md border-b-4 border-amber-400">
-  <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-    <div>
-      <h1 className="text-xl font-bold tracking-wide">SDO BIÑAN CITY — WFP MONITORING PORTAL</h1>
-      <p className="text-xs text-blue-200">Department of Education • Region IV-A CALABARZON</p>
-    </div>
-    <div className="flex items-center gap-3">
-      {currentUser ? (
-        <div className="flex items-center gap-3 bg-blue-950 px-3 py-1.5 rounded-lg border border-blue-800">
-          <div className="text-right">
-            <p className="text-xs font-bold text-amber-400 flex items-center justify-end gap-1">
-              <UserCheck className="w-3.5 h-3.5" /> {currentUser.name || currentUser.username || currentUser.email}
-            </p>
-            <p className="text-[10px] uppercase tracking-wider text-blue-300 font-bold">
-              Role: <span className="text-emerald-400">{userRole ? userRole.replace('_', ' ') : currentUser?.user_role || 'Admin'}</span>
-            </p>
+      {/* Header */}
+      <header className="bg-blue-900 text-white shadow-md border-b-4 border-amber-400">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-bold tracking-wide">SDO BIÑAN CITY — WFP MONITORING PORTAL</h1>
+            <p className="text-xs text-blue-200">Department of Education • Region IV-A CALABARZON</p>
           </div>
+          <div className="flex items-center gap-3">
+            {currentUser ? (
+              <div className="flex items-center gap-3 bg-blue-950 px-3 py-1.5 rounded-lg border border-blue-800">
+                <div className="text-right">
+                  <p className="text-xs font-bold text-amber-400 flex items-center justify-end gap-1">
+                    <UserCheck className="w-3.5 h-3.5" /> {currentUser.name || currentUser.username || currentUser.email}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-blue-300 font-bold">
+                    Role: <span className="text-emerald-400">{(userRole || currentUser?.user_role || 'Admin').replace('_', ' ')}</span>
+                  </p>
+                </div>
 
-          {/* Control Center Button: STRICTLY for super_admin ONLY */}
-          {(userRole === 'super_admin' || currentUser?.user_role === 'super_admin') && (
-            <button
-              onClick={() => router.push('/admin/users')}
-              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-extrabold text-xs px-2.5 py-1 rounded shadow transition"
-              title="Open Super Admin User Management"
+                {/* Control Center Button: EXCLUSIVELY AVAILABLE FOR SUPER ADMIN */}
+                {(userRole === 'super_admin' || currentUser?.user_role === 'super_admin') && (
+                  <button
+                    onClick={() => router.push('/admin/users')}
+                    className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-extrabold text-xs px-2.5 py-1 rounded shadow transition"
+                    title="Open User Control Center"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" /> Control Center
+                  </button>
+                )}
+
+                <button
+                  onClick={handleSignOut}
+                  title="Sign Out"
+                  className="bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded transition ml-1"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => router.push('/login')}
+                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-bold text-xs px-3.5 py-2 rounded-md shadow transition"
+              >
+                Admin Sign In
+              </button>
+            )}
+
+            <button 
+              onClick={handleExportCSV}
+              disabled={filteredWfps.length === 0}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-3 py-2 rounded-md shadow transition"
             >
-              <ShieldAlert className="w-3.5 h-3.5" /> Control Center
+              <Download className="w-4 h-4" /> Export CSV
             </button>
-          )}
-
-          <button
-            onClick={handleSignOut}
-            title="Sign Out"
-            className="bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded transition ml-1"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-1.5 bg-blue-800 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-md shadow transition border border-blue-700"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" /> Submit WFP
+            </button>
+            <button 
+              onClick={checkSessionAndFetchData}
+              className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 text-xs px-3 py-2 rounded-md font-medium transition"
+            >
+              <RefreshCw className="w-4 h-4" /> Sync
+            </button>
+          </div>
         </div>
-      ) : (
-        <button
-          onClick={() => router.push('/login')}
-          className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-bold text-xs px-3.5 py-2 rounded-md shadow transition"
-        >
-          Admin Sign In
-        </button>
-      )}
-
-      <button 
-        onClick={handleExportCSV}
-        disabled={filteredWfps.length === 0}
-        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-3 py-2 rounded-md shadow transition"
-      >
-        <Download className="w-4 h-4" /> Export CSV
-      </button>
-      <button 
-        onClick={() => setIsModalOpen(true)}
-        className="flex items-center gap-1.5 bg-blue-800 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-md shadow transition border border-blue-700"
-      >
-        <Plus className="w-4 h-4 stroke-[3]" /> Submit WFP
-      </button>
-      <button 
-        onClick={checkSessionAndFetchData}
-        className="flex items-center gap-2 bg-blue-800 hover:bg-blue-700 text-xs px-3 py-2 rounded-md font-medium transition"
-      >
-        <RefreshCw className="w-4 h-4" /> Sync
-      </button>
-    </div>
-  </div>
-</header>
+      </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* CONDITIONAL SWITCH: If user is Focal Person, show Focal Dashboard */}
