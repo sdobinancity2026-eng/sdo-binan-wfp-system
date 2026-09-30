@@ -304,19 +304,12 @@ function handleSignOut() {
             </p>
           </div>
 
-          {/* Control Center Button: Visible to both super_admin AND admin roles */}
-          {(
-            userRole === 'super_admin' || 
-            userRole === 'admin' || 
-            currentUser?.user_role === 'super_admin' || 
-            currentUser?.user_role === 'admin' ||
-            currentUser?.role === 'super_admin' ||
-            currentUser?.role === 'admin'
-          ) && (
+          {/* Control Center Button: STRICTLY for super_admin ONLY */}
+          {(userRole === 'super_admin' || currentUser?.user_role === 'super_admin') && (
             <button
               onClick={() => router.push('/admin/users')}
               className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-blue-950 font-extrabold text-xs px-2.5 py-1 rounded shadow transition"
-              title="Open User Control Center"
+              title="Open Super Admin User Management"
             >
               <ShieldAlert className="w-3.5 h-3.5" /> Control Center
             </button>
