@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   ShieldCheck, UserPlus, Trash2, ArrowLeft, 
-  Building, User, Mail, Lock, ShieldAlert, CheckCircle, AlertCircle, RefreshCw
+  Building, User, Mail, Lock, ShieldAlert, CheckCircle, AlertCircle, RefreshCw, Shield
 } from 'lucide-react';
 
 interface AdminUser {
@@ -15,6 +15,7 @@ interface AdminUser {
   office: string;
   position: string;
   username: string;
+  user_role?: string;
   created_at: string;
 }
 
@@ -31,6 +32,7 @@ export default function SuperAdminUsersPage() {
   const [position, setPosition] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [userRole, setUserRole] = useState<'super_admin' | 'division_admin' | 'focal_person'>('division_admin');
 
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
@@ -86,6 +88,7 @@ export default function SuperAdminUsersPage() {
         position: position.trim() || 'Division Officer',
         username: username.trim().toLowerCase(),
         password: password.trim(),
+        user_role: userRole,
       },
     ]);
 
@@ -94,12 +97,13 @@ export default function SuperAdminUsersPage() {
     if (error) {
       setFormError(error.message || 'Failed to add administrator.');
     } else {
-      setFormSuccess(`Administrator ${name} created successfully!`);
+      setFormSuccess(`Administrator ${name} created successfully as ${userRole.replace('_', ' ').toUpperCase()}!`);
       setName('');
       setEmail('');
       setPosition('');
       setUsername('');
       setPassword('');
+      setUserRole('division_admin');
       fetchAdmins();
     }
   }
@@ -175,6 +179,23 @@ export default function SuperAdminUsersPage() {
                 <span>{formSuccess}</span>
               </div>
             )}
+
+            {/* Role Selection Dropdown */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Admin Access Role *</label>
+              <div className="relative">
+                <Shield className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                <select
+                  value={userRole}
+                  onChange={(e) => setUserRole(e.target.value as any)}
+                  className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-blue-950 focus:ring-2 focus:ring-blue-800 focus:outline-none bg-slate-50"
+                >
+                  <option value="division_admin">Division Admin (Approve / Review WFP)</option>
+                  <option value="super_admin">Super Admin (Full System Control & User Management)</option>
+                  <option value="focal_person">Focal Person (Submit & Edit Unit WFPs)</option>
+                </select>
+              </div>
+            </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Full Name *</label>
@@ -294,6 +315,16 @@ export default function SuperAdminUsersPage() {
                       <p className="font-bold text-sm text-slate-800">{admin.name}</p>
                       <span className="text-[10px] bg-blue-100 text-blue-900 font-extrabold px-2 py-0.5 rounded">
                         @{admin.username}
+                      </span>
+                      {/* Role Badge */}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                        admin.user_role === 'super_admin' 
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                          : admin.user_role === 'focal_person'
+                          ? 'bg-purple-100 text-purple-900'
+                          : 'bg-emerald-100 text-emerald-900'
+                      }`}>
+                        {admin.user_role ? admin.user_role.replace('_', ' ') : 'division admin'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">{admin.email}</p>

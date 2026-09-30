@@ -51,15 +51,18 @@ export default function AdminDashboard() {
 async function checkSessionAndFetchData() {
   setLoading(true);
 
-  // 1. Check custom admin session in localStorage
+  // 1. Check custom admin session in localStorage & set specific role
   const savedSession = localStorage.getItem('sdo_admin_session');
   if (savedSession) {
     try {
       const adminData = JSON.parse(savedSession);
       setCurrentUser(adminData);
-      setUserRole('admin');
+      // Read specific role stored during login ('super_admin', 'division_admin', or 'focal_person')
+      setUserRole(adminData.role || 'division_admin');
     } catch (e) {
       localStorage.removeItem('sdo_admin_session');
+      setCurrentUser(null);
+      setUserRole(null);
     }
   } else {
     setCurrentUser(null);
