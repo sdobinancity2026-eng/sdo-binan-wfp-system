@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { WFPItem, Department } from '@/types/wfp';
 import { RefreshCw, BarChart2, Plus, X, CheckCircle, AlertCircle, Search, Filter, RotateCcw, Download, CheckCircle2, Clock, FileText, ChevronRight, AlertTriangle, LogOut, ShieldAlert, UserCheck } from 'lucide-react';
+import FocalPersonDashboard from './components/FocalPersonDashboard';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -355,243 +356,251 @@ function handleSignOut() {
 </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {!currentUser && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
-              <span>
-                <strong>Public View Mode:</strong> You are currently viewing public WFP tracking data. Only authenticated <strong>Division Administrators</strong> can approve or revise submission statuses.
-              </span>
-            </div>
-            <button
-              onClick={() => router.push('/login')}
-              className="px-3 py-1.5 bg-amber-600 text-white rounded font-bold text-xs hover:bg-amber-700 transition"
-            >
-              Admin Login
-            </button>
-          </div>
-        )}
+        {/* CONDITIONAL SWITCH: If user is Focal Person, show Focal Dashboard */}
+        {currentUser && userRole === 'focal_person' ? (
+          <FocalPersonDashboard wfps={wfps} currentUser={currentUser} />
+        ) : (
+          /* OTHERWISE: Render existing Executive Overview / Admin Dashboard */
+          <>
+            {!currentUser && (
+              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
+                  <span>
+                    <strong>Public View Mode:</strong> You are currently viewing public WFP tracking data. Only authenticated <strong>Division Administrators</strong> can approve or revise submission statuses.
+                  </span>
+                </div>
+                <button
+                  onClick={() => router.push('/login')}
+                  className="px-3 py-1.5 bg-amber-600 text-white rounded font-bold text-xs hover:bg-amber-700 transition"
+                >
+                  Admin Login
+                </button>
+              </div>
+            )}
 
-        <div className="mb-6 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <BarChart2 className="w-5 h-5 text-blue-900" /> Executive Overview
-          </h2>
-        </div>
-
-        {/* Overview Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-xs font-bold text-slate-500 uppercase">Total Allocation</p>
-            <p className="text-2xl font-black text-slate-800 mt-1">₱{totalAllocated.toLocaleString()}</p>
-          </div>
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-xs font-bold text-slate-500 uppercase">Total Obligated</p>
-            <p className="text-2xl font-black text-blue-900 mt-1">₱{totalObligated.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-1">BUR: <span className="font-bold text-blue-800">{burObligation}%</span></p>
-          </div>
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-xs font-bold text-slate-500 uppercase">Total Disbursed</p>
-            <p className="text-2xl font-black text-emerald-700 mt-1">₱{totalDisbursed.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-1">Disbursement Rate: <span className="font-bold text-emerald-700">{burDisbursement}%</span></p>
-          </div>
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-xs font-bold text-slate-500 uppercase">Pending Review</p>
-            <p className="text-2xl font-black text-amber-600 mt-1">
-              {filteredWfps.filter((w: WFPItem) => w.status === 'For Review').length}
-            </p>
-            <p className="text-xs text-slate-500 mt-1">Requires Admin Action</p>
-          </div>
-        </div>
-
-        {/* Filter Bar */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100 text-xs font-bold text-slate-700 uppercase tracking-wider">
-            <Filter className="w-4 h-4 text-blue-900" /> Search & Filter Submissions
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-            <div className="md:col-span-4 relative">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-              <input 
-                type="text"
-                placeholder="Search by PPA title, AIP code, or KPI..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
-              />
+            <div className="mb-6 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-blue-900" /> Executive Overview
+              </h2>
             </div>
 
-            <div className="md:col-span-3">
-              <select 
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
-                value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
-              >
-                <option value="ALL">All Departments</option>
-                {departments.map(d => (
-                  <option key={d.id} value={d.id}>{d.code} - {d.name}</option>
-                ))}
-              </select>
+            {/* Overview Stat Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <p className="text-xs font-bold text-slate-500 uppercase">Total Allocation</p>
+                <p className="text-2xl font-black text-slate-800 mt-1">₱{totalAllocated.toLocaleString()}</p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <p className="text-xs font-bold text-slate-500 uppercase">Total Obligated</p>
+                <p className="text-2xl font-black text-blue-900 mt-1">₱{totalObligated.toLocaleString()}</p>
+                <p className="text-xs text-slate-500 mt-1">BUR: <span className="font-bold text-blue-800">{burObligation}%</span></p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <p className="text-xs font-bold text-slate-500 uppercase">Total Disbursed</p>
+                <p className="text-2xl font-black text-emerald-700 mt-1">₱{totalDisbursed.toLocaleString()}</p>
+                <p className="text-xs text-slate-500 mt-1">Disbursement Rate: <span className="font-bold text-emerald-700">{burDisbursement}%</span></p>
+              </div>
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <p className="text-xs font-bold text-slate-500 uppercase">Pending Review</p>
+                <p className="text-2xl font-black text-amber-600 mt-1">
+                  {filteredWfps.filter((w: WFPItem) => w.status === 'For Review').length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Requires Admin Action</p>
+              </div>
             </div>
 
-            <div className="md:col-span-2">
-              <select 
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="For Review">For Review</option>
-                <option value="Approved">Approved</option>
-                <option value="Needs Revision">Needs Revision</option>
-              </select>
+            {/* Filter Bar */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <Filter className="w-4 h-4 text-blue-900" /> Search & Filter Submissions
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div className="md:col-span-4 relative">
+                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                  <input 
+                    type="text"
+                    placeholder="Search by PPA title, AIP code, or KPI..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
+                  />
+                </div>
+
+                <div className="md:col-span-3">
+                  <select 
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
+                    value={selectedDept}
+                    onChange={(e) => setSelectedDept(e.target.value)}
+                  >
+                    <option value="ALL">All Departments</option>
+                    {departments.map(d => (
+                      <option key={d.id} value={d.id}>{d.code} - {d.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <select 
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="For Review">For Review</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Needs Revision">Needs Revision</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2 flex items-center gap-1.5">
+                  <input 
+                    type="number"
+                    placeholder="Min ₱"
+                    value={minBudget}
+                    onChange={(e) => setMinBudget(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-2.5 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
+                  />
+                  <span className="text-slate-400 text-xs">-</span>
+                  <input 
+                    type="number"
+                    placeholder="Max ₱"
+                    value={maxBudget}
+                    onChange={(e) => setMaxBudget(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-2.5 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
+                  />
+                </div>
+
+                <div className="md:col-span-1 flex justify-end">
+                  <button
+                    onClick={resetFilters}
+                    className="w-full flex items-center justify-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Reset
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="md:col-span-2 flex items-center gap-1.5">
-              <input 
-                type="number"
-                placeholder="Min ₱"
-                value={minBudget}
-                onChange={(e) => setMinBudget(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-2.5 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
-              />
-              <span className="text-slate-400 text-xs">-</span>
-              <input 
-                type="number"
-                placeholder="Max ₱"
-                value={maxBudget}
-                onChange={(e) => setMaxBudget(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-2.5 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
-              />
-            </div>
+            {/* WFP Table */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="font-bold text-slate-800">Focal Person WFP Submissions</h3>
+                <span className="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-600 font-semibold">
+                  Showing {filteredWfps.length} of {wfps.length} Total Plans
+                </span>
+              </div>
 
-            <div className="md:col-span-1 flex justify-end">
-              <button
-                onClick={resetFilters}
-                className="w-full flex items-center justify-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Reset
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* WFP Table */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-bold text-slate-800">Focal Person WFP Submissions</h3>
-            <span className="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-600 font-semibold">
-              Showing {filteredWfps.length} of {wfps.length} Total Plans
-            </span>
-          </div>
-
-          {loading ? (
-            <div className="p-8 text-center text-slate-500">Loading WFP records...</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50 text-slate-600 font-semibold border-b">
-                  <tr>
-                    <th className="p-4">Program / Activity (PPA)</th>
-                    <th className="p-4">Department</th>
-                    <th className="p-4">AIP Alignment</th>
-                    <th className="p-4">Allocation</th>
-                    <th className="p-4">Obligation Rate</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Evidence of Success</th>
-                    <th className="p-4">KPI</th>
-                    <th className="p-4">Leading Indicator</th>
-                    <th className="p-4">Lagging Indicator</th>
-                    <th className="p-4">Target</th>
-                    <th className="p-4 text-center">Admin Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredWfps.length === 0 ? (
-                    <tr>
-                      <td colSpan={12} className="p-6 text-center text-slate-400">
-                        No WFP records match your current filter criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredWfps.map((wfp: WFPItem) => {
-                      const oblRate = wfp.total_allocated > 0 
-                        ? ((wfp.total_obligated / wfp.total_allocated) * 100).toFixed(0) 
-                        : 0;
-
-                      return (
-                        <tr key={wfp.id} className="hover:bg-slate-50 transition">
-                          <td className="p-4">
-                            <button
-                              onClick={() => setSelectedWfpForTracking(wfp)}
-                              className="text-left group focus:outline-none"
-                            >
-                              <p className="font-bold text-blue-900 group-hover:text-amber-600 group-hover:underline flex items-center gap-1.5 transition">
-                                {wfp.title} <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-600" />
-                              </p>
-                              <p className="text-xs text-slate-500">Focal: {wfp.profiles?.full_name || 'Unassigned'} • <span className="text-amber-600 font-semibold hover:underline">Track Submission</span></p>
-                            </button>
-                          </td>
-                          <td className="p-4 font-medium text-slate-700">{wfp.departments?.code || '-'}</td>
-                          <td className="p-4">
-                            <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              {wfp.aip_code || 'AIP-Aligned'}
-                            </span>
-                          </td>
-                          <td className="p-4 font-semibold text-slate-800">₱{Number(wfp.total_allocated).toLocaleString()}</td>
-                          <td className="p-4">
-                            <div className="w-24 bg-slate-200 rounded-full h-2 mt-1">
-                              <div 
-                                className="bg-blue-800 h-2 rounded-full" 
-                                style={{ width: `${Math.min(Number(oblRate), 100)}%` }} 
-                              />
-                            </div>
-                            <span className="text-xs text-slate-500 font-medium">{oblRate}% Obligated</span>
-                          </td>
-                          <td className="p-4">
-                            <span className={`text-xs px-2.5 py-1 rounded-md font-bold ${
-                              wfp.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
-                              wfp.status === 'For Review' ? 'bg-amber-100 text-amber-800' :
-                              wfp.status === 'Needs Revision' ? 'bg-rose-100 text-rose-800' :
-                              'bg-slate-100 text-slate-700'
-                            }`}>
-                              {wfp.status}
-                            </span>
-                          </td>
-                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.evidence_of_success || '-'}</td>
-                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.kpi || '-'}</td>
-                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.leading_indicator || '-'}</td>
-                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.lagging_indicator || '-'}</td>
-                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.target || '-'}</td>
-                          <td className="p-4 text-center">
-                            {userRole === 'admin' ? (
-                              <div className="flex justify-center gap-1">
-                                <button 
-                                  onClick={() => handleStatusChange(wfp.id, 'Approved')}
-                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold shadow-sm transition"
-                                >
-                                  Approve
-                                </button>
-                                <button 
-                                  onClick={() => handleStatusChange(wfp.id, 'Needs Revision')}
-                                  className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold shadow-sm transition"
-                                >
-                                  Revise
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="text-[11px] text-slate-400 italic">Admin Login Required</span>
-                            )}
+              {loading ? (
+                <div className="p-8 text-center text-slate-500">Loading WFP records...</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b">
+                      <tr>
+                        <th className="p-4">Program / Activity (PPA)</th>
+                        <th className="p-4">Department</th>
+                        <th className="p-4">AIP Alignment</th>
+                        <th className="p-4">Allocation</th>
+                        <th className="p-4">Obligation Rate</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4">Evidence of Success</th>
+                        <th className="p-4">KPI</th>
+                        <th className="p-4">Leading Indicator</th>
+                        <th className="p-4">Lagging Indicator</th>
+                        <th className="p-4">Target</th>
+                        <th className="p-4 text-center">Admin Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredWfps.length === 0 ? (
+                        <tr>
+                          <td colSpan={12} className="p-6 text-center text-slate-400">
+                            No WFP records match your current filter criteria.
                           </td>
                         </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                      ) : (
+                        filteredWfps.map((wfp: WFPItem) => {
+                          const oblRate = wfp.total_allocated > 0 
+                            ? ((wfp.total_obligated / wfp.total_allocated) * 100).toFixed(0) 
+                            : 0;
+
+                          return (
+                            <tr key={wfp.id} className="hover:bg-slate-50 transition">
+                              <td className="p-4">
+                                <button
+                                  onClick={() => setSelectedWfpForTracking(wfp)}
+                                  className="text-left group focus:outline-none"
+                                >
+                                  <p className="font-bold text-blue-900 group-hover:text-amber-600 group-hover:underline flex items-center gap-1.5 transition">
+                                    {wfp.title} <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-600" />
+                                  </p>
+                                  <p className="text-xs text-slate-500">Focal: {wfp.profiles?.full_name || 'Unassigned'} • <span className="text-amber-600 font-semibold hover:underline">Track Submission</span></p>
+                                </button>
+                              </td>
+                              <td className="p-4 font-medium text-slate-700">{wfp.departments?.code || '-'}</td>
+                              <td className="p-4">
+                                <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {wfp.aip_code || 'AIP-Aligned'}
+                                </span>
+                              </td>
+                              <td className="p-4 font-semibold text-slate-800">₱{Number(wfp.total_allocated).toLocaleString()}</td>
+                              <td className="p-4">
+                                <div className="w-24 bg-slate-200 rounded-full h-2 mt-1">
+                                  <div 
+                                    className="bg-blue-800 h-2 rounded-full" 
+                                    style={{ width: `${Math.min(Number(oblRate), 100)}%` }} 
+                                  />
+                                </div>
+                                <span className="text-xs text-slate-500 font-medium">{oblRate}% Obligated</span>
+                              </td>
+                              <td className="p-4">
+                                <span className={`text-xs px-2.5 py-1 rounded-md font-bold ${
+                                  wfp.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                                  wfp.status === 'For Review' ? 'bg-amber-100 text-amber-800' :
+                                  wfp.status === 'Needs Revision' ? 'bg-rose-100 text-rose-800' :
+                                  'bg-slate-100 text-slate-700'
+                                }`}>
+                                  {wfp.status}
+                                </span>
+                              </td>
+                              <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.evidence_of_success || '-'}</td>
+                              <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.kpi || '-'}</td>
+                              <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.leading_indicator || '-'}</td>
+                              <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.lagging_indicator || '-'}</td>
+                              <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{wfp.target || '-'}</td>
+                              <td className="p-4 text-center">
+                                {userRole === 'admin' || userRole === 'division_admin' || userRole === 'super_admin' ? (
+                                  <div className="flex justify-center gap-1">
+                                    <button 
+                                      onClick={() => handleStatusChange(wfp.id, 'Approved')}
+                                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold shadow-sm transition"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button 
+                                      onClick={() => handleStatusChange(wfp.id, 'Needs Revision')}
+                                      className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold shadow-sm transition"
+                                    >
+                                      Revise
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400 italic">Admin Login Required</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </main>
 
       {/* Shopee-style Tracking Modal */}
