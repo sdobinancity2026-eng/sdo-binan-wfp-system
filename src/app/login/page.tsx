@@ -3,7 +3,7 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { Lock, User, AlertCircle, ShieldCheck, Building, BadgeCheck } from 'lucide-react';
+import { Lock, User, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,10 +19,10 @@ export default function LoginPage() {
 
     const cleanIdentifier = identifier.trim();
 
-    // Query custom admins table for matching username OR email AND password
+    // 1. Fetch user_role along with other columns from Supabase
     const { data: admin, error } = await supabase
       .from('admins')
-      .select('id, name, email, office, position, username')
+      .select('id, name, email, office, position, username, user_role')
       .or(`username.eq.${cleanIdentifier},email.eq.${cleanIdentifier}`)
       .eq('password', password)
       .maybeSingle();
@@ -33,7 +33,9 @@ export default function LoginPage() {
       return;
     }
 
-    // Save admin session details in browser localStorage
+    // 2. Dynamically store the user_role from Supabase into localStorage
+    const userRole = admin.user_role || 'admin';
+
     localStorage.setItem('sdo_admin_session', JSON.stringify({
       id: admin.id,
       name: admin.name,
@@ -41,7 +43,8 @@ export default function LoginPage() {
       office: admin.office,
       position: admin.position,
       username: admin.username,
-      role: 'admin',
+      user_role: userRole,
+      role: userRole,
       loggedInAt: new Date().toISOString()
     }));
 
@@ -57,7 +60,7 @@ export default function LoginPage() {
             <ShieldCheck className="w-7 h-7" />
           </div>
           <h1 className="text-xl font-extrabold tracking-wide">SDO BIÑAN CITY</h1>
-          <p className="text-xs text-blue-200 mt-1">Administrator Portal Portal</p>
+          <p className="text-xs text-blue-200 mt-1">Administrator Portal</p>
         </div>
 
         <form onSubmit={handleLogin} className="p-6 space-y-4">
