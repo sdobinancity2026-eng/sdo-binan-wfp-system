@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   ShieldCheck, UserPlus, Trash2, ArrowLeft, 
-  Building, User, Mail, Lock, ShieldAlert, CheckCircle, AlertCircle, RefreshCw, Shield
+  Building, User, Mail, Lock, CheckCircle, AlertCircle, RefreshCw, Shield
 } from 'lucide-react';
 
 interface AdminUser {
@@ -25,7 +25,7 @@ export default function SuperAdminUsersPage() {
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // New Admin Form State
+  // New User Form State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [office, setOffice] = useState('Office of the Schools Division Superintendent');
@@ -39,7 +39,7 @@ export default function SuperAdminUsersPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in as Super Admin
+    // Check if user is logged in
     const savedSession = localStorage.getItem('sdo_admin_session');
     if (!savedSession) {
       router.push('/login');
@@ -85,7 +85,7 @@ export default function SuperAdminUsersPage() {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         office: office.trim(),
-        position: position.trim() || 'Division Officer',
+        position: position.trim() || (userRole === 'focal_person' ? 'Program Focal Person' : 'Division Officer'),
         username: username.trim().toLowerCase(),
         password: password.trim(),
         user_role: userRole,
@@ -95,9 +95,10 @@ export default function SuperAdminUsersPage() {
     setSubmitting(false);
 
     if (error) {
-      setFormError(error.message || 'Failed to add administrator.');
+      setFormError(error.message || 'Failed to create user account.');
     } else {
-      setFormSuccess(`Administrator ${name} created successfully as ${userRole.replace('_', ' ').toUpperCase()}!`);
+      const roleLabel = userRole === 'focal_person' ? 'Focal Person' : userRole.replace('_', ' ').toUpperCase();
+      setFormSuccess(`Account for ${name} created successfully as ${roleLabel}!`);
       setName('');
       setEmail('');
       setPosition('');
@@ -110,11 +111,11 @@ export default function SuperAdminUsersPage() {
 
   async function handleDeleteAdmin(id: string, adminName: string) {
     if (adminList.length <= 1) {
-      alert('Cannot delete the only remaining administrator account.');
+      alert('Cannot delete the only remaining user account.');
       return;
     }
 
-    if (!confirm(`Are you sure you want to revoke and delete admin privileges for "${adminName}"?`)) {
+    if (!confirm(`Are you sure you want to revoke and delete account access for "${adminName}"?`)) {
       return;
     }
 
@@ -158,11 +159,13 @@ export default function SuperAdminUsersPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Create Admin Form */}
+        {/* Left Column: Create User Form */}
         <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit">
           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
             <UserPlus className="w-5 h-5 text-blue-900" />
-            <h2 className="font-bold text-slate-800 text-base">Add New Administrator</h2>
+            <h2 className="font-bold text-slate-800 text-base">
+              Add New {userRole === 'focal_person' ? 'Focal Person' : 'Administrator'}
+            </h2>
           </div>
 
           <form onSubmit={handleAddAdmin} className="space-y-4">
@@ -182,7 +185,7 @@ export default function SuperAdminUsersPage() {
 
             {/* Role Selection Dropdown */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Admin Access Role *</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Account Access Role *</label>
               <div className="relative">
                 <Shield className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                 <select
@@ -190,9 +193,9 @@ export default function SuperAdminUsersPage() {
                   onChange={(e) => setUserRole(e.target.value as any)}
                   className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-blue-950 focus:ring-2 focus:ring-blue-800 focus:outline-none bg-slate-50"
                 >
+                  <option value="focal_person">Focal Person (Submit & Edit Unit WFPs)</option>
                   <option value="division_admin">Division Admin (Approve / Review WFP)</option>
                   <option value="super_admin">Super Admin (Full System Control & User Management)</option>
-                  <option value="focal_person">Focal Person (Submit & Edit Unit WFPs)</option>
                 </select>
               </div>
             </div>
@@ -244,7 +247,7 @@ export default function SuperAdminUsersPage() {
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Position / Designation</label>
               <input
                 type="text"
-                placeholder="e.g. Chief Education Supervisor / IT Officer"
+                placeholder={userRole === 'focal_person' ? 'e.g. Program Focal Person / Chief' : 'e.g. Chief Education Supervisor / IT Officer'}
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-800 focus:outline-none"
@@ -284,17 +287,24 @@ export default function SuperAdminUsersPage() {
               disabled={submitting}
               className="w-full py-2.5 bg-blue-900 hover:bg-blue-800 text-white rounded-lg font-bold text-xs shadow transition mt-2 disabled:opacity-50"
             >
-              {submitting ? 'Creating Administrator...' : 'Register Administrator'}
+              {submitting 
+                ? 'Saving Account...' 
+                : userRole === 'focal_person' 
+                  ? 'Register Focal Person' 
+                  : 'Register Administrator'
+              }
             </button>
           </form>
         </div>
 
-        {/* Right Column: Active User List */}
+        {/* Right Column: Active Users List */}
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
             <div>
-              <h3 className="font-bold text-slate-800">Active Division Administrators</h3>
-              <p className="text-xs text-slate-500">Authorized personnel who can approve & revise WFPs</p>
+              <h3 className="font-bold text-slate-800">Active System Users</h3>
+              <p className="text-xs text-slate-500">
+                Authorized Super Admins, Division Administrators, and Unit Focal Persons
+              </p>
             </div>
             <button
               onClick={fetchAdmins}
@@ -305,43 +315,47 @@ export default function SuperAdminUsersPage() {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-slate-500 text-xs">Loading admin records...</div>
+            <div className="p-8 text-center text-slate-500 text-xs">Loading user accounts...</div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {adminList.map((admin) => (
-                <div key={admin.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-sm text-slate-800">{admin.name}</p>
-                      <span className="text-[10px] bg-blue-100 text-blue-900 font-extrabold px-2 py-0.5 rounded">
-                        @{admin.username}
-                      </span>
-                      {/* Role Badge */}
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                        admin.user_role === 'super_admin' 
-                          ? 'bg-amber-100 text-amber-900 border border-amber-300' 
-                          : admin.user_role === 'focal_person'
-                          ? 'bg-purple-100 text-purple-900'
-                          : 'bg-emerald-100 text-emerald-900'
-                      }`}>
-                        {admin.user_role ? admin.user_role.replace('_', ' ') : 'division admin'}
-                      </span>
+              {adminList.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">No registered users found.</div>
+              ) : (
+                adminList.map((admin) => (
+                  <div key={admin.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-sm text-slate-800">{admin.name}</p>
+                        <span className="text-[10px] bg-blue-100 text-blue-900 font-extrabold px-2 py-0.5 rounded">
+                          @{admin.username}
+                        </span>
+                        {/* Role Badge */}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                          admin.user_role === 'super_admin' 
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                            : admin.user_role === 'focal_person'
+                            ? 'bg-purple-100 text-purple-900 border border-purple-200'
+                            : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                        }`}>
+                          {admin.user_role ? admin.user_role.replace('_', ' ') : 'division admin'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{admin.email}</p>
+                      <p className="text-xs text-slate-600 mt-1">
+                        <span className="font-medium text-slate-700">{admin.position || 'User'}</span> • {admin.office}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">{admin.email}</p>
-                    <p className="text-xs text-slate-600 mt-1">
-                      <span className="font-medium text-slate-700">{admin.position || 'Admin'}</span> • {admin.office}
-                    </p>
-                  </div>
 
-                  <button
-                    onClick={() => handleDeleteAdmin(admin.id, admin.name)}
-                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                    title="Revoke Admin Access"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+                    <button
+                      onClick={() => handleDeleteAdmin(admin.id, admin.name)}
+                      className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                      title="Revoke User Access"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>
