@@ -8,6 +8,15 @@ import {
   Building, User, Mail, Lock, CheckCircle, AlertCircle, RefreshCw, Shield
 } from 'lucide-react';
 
+// Type definitions expanded to support all required user roles
+type UserRole = 
+  | 'super_admin' 
+  | 'division_admin' 
+  | 'focal_person' 
+  | 'head_of_office' 
+  | 'budget_officer' 
+  | 'bac_officer';
+
 interface AdminUser {
   id: string;
   name: string;
@@ -15,7 +24,7 @@ interface AdminUser {
   office: string;
   position: string;
   username: string;
-  user_role?: string;
+  user_role?: UserRole | string;
   created_at: string;
 }
 
@@ -32,7 +41,7 @@ export default function SuperAdminUsersPage() {
   const [position, setPosition] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [userRole, setUserRole] = useState<'super_admin' | 'division_admin' | 'focal_person'>('division_admin');
+  const [userRole, setUserRole] = useState<UserRole>('division_admin');
 
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
@@ -68,6 +77,26 @@ export default function SuperAdminUsersPage() {
     setLoading(false);
   }
 
+  // Fallback position generator based on role selection
+  const getDefaultPosition = (role: UserRole) => {
+    switch (role) {
+      case 'super_admin':
+        return 'Super Administrator';
+      case 'division_admin':
+        return 'Division Admin';
+      case 'focal_person':
+        return 'Program Focal Person';
+      case 'head_of_office':
+        return 'Head of Office';
+      case 'budget_officer':
+        return 'Budget Officer';
+      case 'bac_officer':
+        return 'BAC Officer / Secretariat';
+      default:
+        return 'Division Officer';
+    }
+  };
+
   async function handleAddAdmin(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
@@ -85,7 +114,7 @@ export default function SuperAdminUsersPage() {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         office: office.trim(),
-        position: position.trim() || (userRole === 'focal_person' ? 'Program Focal Person' : 'Division Officer'),
+        position: position.trim() || getDefaultPosition(userRole),
         username: username.trim().toLowerCase(),
         password: password.trim(),
         user_role: userRole,
@@ -97,7 +126,7 @@ export default function SuperAdminUsersPage() {
     if (error) {
       setFormError(error.message || 'Failed to create user account.');
     } else {
-      const roleLabel = userRole === 'focal_person' ? 'Focal Person' : userRole.replace('_', ' ').toUpperCase();
+      const roleLabel = userRole.replace(/_/g, ' ').toUpperCase();
       setFormSuccess(`Account for ${name} created successfully as ${roleLabel}!`);
       setName('');
       setEmail('');
@@ -127,6 +156,26 @@ export default function SuperAdminUsersPage() {
       fetchAdmins();
     }
   }
+
+  // Dynamic styling helper for role badges
+  const getRoleBadgeStyle = (role?: string) => {
+    switch (role) {
+      case 'super_admin':
+        return 'bg-amber-100 text-amber-900 border-amber-300';
+      case 'division_admin':
+        return 'bg-emerald-100 text-emerald-900 border-emerald-200';
+      case 'focal_person':
+        return 'bg-purple-100 text-purple-900 border-purple-200';
+      case 'head_of_office':
+        return 'bg-blue-100 text-blue-900 border-blue-200';
+      case 'budget_officer':
+        return 'bg-teal-100 text-teal-900 border-teal-200';
+      case 'bac_officer':
+        return 'bg-indigo-100 text-indigo-900 border-indigo-200';
+      default:
+        return 'bg-slate-100 text-slate-800 border-slate-200';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -164,7 +213,7 @@ export default function SuperAdminUsersPage() {
           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
             <UserPlus className="w-5 h-5 text-blue-900" />
             <h2 className="font-bold text-slate-800 text-base">
-              Add New {userRole === 'focal_person' ? 'Focal Person' : 'Administrator'}
+              Add New Account
             </h2>
           </div>
 
@@ -190,12 +239,15 @@ export default function SuperAdminUsersPage() {
                 <Shield className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                 <select
                   value={userRole}
-                  onChange={(e) => setUserRole(e.target.value as any)}
+                  onChange={(e) => setUserRole(e.target.value as UserRole)}
                   className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-blue-950 focus:ring-2 focus:ring-blue-800 focus:outline-none bg-slate-50"
                 >
-                  <option value="focal_person">Focal Person (Submit & Edit Unit WFPs)</option>
-                  <option value="division_admin">Division Admin (Approve / Review WFP)</option>
                   <option value="super_admin">Super Admin (Full System Control & User Management)</option>
+                  <option value="division_admin">Division Admin (Approve / Review WFP)</option>
+                  <option value="focal_person">Focal Person (Submit & Edit Unit WFPs)</option>
+                  <option value="head_of_office">Head of Office (Review / Endorse Unit WFPs)</option>
+                  <option value="budget_officer">Budget Officer (Financial Verification & Allotment)</option>
+                  <option value="bac_officer">BAC Officer (Procurement Review & Verification)</option>
                 </select>
               </div>
             </div>
@@ -247,7 +299,7 @@ export default function SuperAdminUsersPage() {
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Position / Designation</label>
               <input
                 type="text"
-                placeholder={userRole === 'focal_person' ? 'e.g. Program Focal Person / Chief' : 'e.g. Chief Education Supervisor / IT Officer'}
+                placeholder={`Default: ${getDefaultPosition(userRole)}`}
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-800 focus:outline-none"
@@ -289,9 +341,7 @@ export default function SuperAdminUsersPage() {
             >
               {submitting 
                 ? 'Saving Account...' 
-                : userRole === 'focal_person' 
-                  ? 'Register Focal Person' 
-                  : 'Register Administrator'
+                : `Register ${userRole.replace(/_/g, ' ').toUpperCase()}`
               }
             </button>
           </form>
@@ -303,7 +353,7 @@ export default function SuperAdminUsersPage() {
             <div>
               <h3 className="font-bold text-slate-800">Active System Users</h3>
               <p className="text-xs text-slate-500">
-                Authorized Super Admins, Division Administrators, and Unit Focal Persons
+                Authorized System Users & Access Privileges
               </p>
             </div>
             <button
@@ -329,15 +379,9 @@ export default function SuperAdminUsersPage() {
                         <span className="text-[10px] bg-blue-100 text-blue-900 font-extrabold px-2 py-0.5 rounded">
                           @{admin.username}
                         </span>
-                        {/* Role Badge */}
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                          admin.user_role === 'super_admin' 
-                            ? 'bg-amber-100 text-amber-900 border border-amber-300' 
-                            : admin.user_role === 'focal_person'
-                            ? 'bg-purple-100 text-purple-900 border border-purple-200'
-                            : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
-                        }`}>
-                          {admin.user_role ? admin.user_role.replace('_', ' ') : 'division admin'}
+                        {/* Dynamic Role Badge */}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase border ${getRoleBadgeStyle(admin.user_role)}`}>
+                          {admin.user_role ? admin.user_role.replace(/_/g, ' ') : 'division admin'}
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{admin.email}</p>
