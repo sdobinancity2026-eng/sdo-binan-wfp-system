@@ -4,6 +4,11 @@ import { ReactNode } from 'react';
 export const metadata = {
   title: 'SDO Biñan WFP Monitoring Portal',
   description: 'Work and Financial Plan Monitoring System - DepEd SDO Biñan City',
+  icons: {
+    icon: '/DOB_LOGO.png',
+    shortcut: '/DOB_LOGO.png',
+    apple: '/DOB_LOGO.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
