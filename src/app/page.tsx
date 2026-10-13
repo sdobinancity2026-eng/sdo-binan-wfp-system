@@ -33,72 +33,67 @@ export default function AdminDashboard() {
   // Tracking Modal State
   const [selectedWfpForTracking, setSelectedWfpForTracking] = useState<WFPItem | null>(null);
 
-  // Form Fields State
+  // Form Fields State (Aligned with WFP Template FY 2026)
   const [title, setTitle] = useState('');
   const [aipCode, setAipCode] = useState('');
   const [departmentId, setDepartmentId] = useState('');
-  const [allocatedBudget, setAllocatedBudget] = useState('');
-  const [evidenceOfSuccess, setEvidenceOfSuccess] = useState('');
-  const [kpi, setKpi] = useState('');
-  const [leadingIndicator, setLeadingIndicator] = useState('');
-  const [laggingIndicator, setLaggingIndicator] = useState('');
-  const [target, setTarget] = useState('');
+  const [eligibleItems, setEligibleItems] = useState('');
+  const [performanceIndicators, setPerformanceIndicators] = useState('');
+  const [q1Budget, setQ1Budget] = useState('');
+  const [q2Budget, setQ2Budget] = useState('');
+  const [q3Budget, setQ3Budget] = useState('');
+  const [q4Budget, setQ4Budget] = useState('');
 
   useEffect(() => {
     checkSessionAndFetchData();
   }, []);
 
-  // Replace the checkSessionAndFetchData function in src/app/page.tsx with this:
-async function checkSessionAndFetchData() {
-  setLoading(true);
+  async function checkSessionAndFetchData() {
+    setLoading(true);
 
-  // 1. Check custom admin session in localStorage & set specific role dynamically
-  const savedSession = localStorage.getItem('sdo_admin_session');
-  if (savedSession) {
-    try {
-      const adminData = JSON.parse(savedSession);
-      setCurrentUser(adminData);
-      
-      // Check user_role first, then role, before falling back
-      const detectedRole = adminData.user_role || adminData.role || 'division_admin';
-      setUserRole(detectedRole);
-    } catch (e) {
-      localStorage.removeItem('sdo_admin_session');
+    const savedSession = localStorage.getItem('sdo_admin_session');
+    if (savedSession) {
+      try {
+        const adminData = JSON.parse(savedSession);
+        setCurrentUser(adminData);
+        
+        const detectedRole = adminData.user_role || adminData.role || 'division_admin';
+        setUserRole(detectedRole);
+      } catch (e) {
+        localStorage.removeItem('sdo_admin_session');
+        setCurrentUser(null);
+        setUserRole(null);
+      }
+    } else {
       setCurrentUser(null);
       setUserRole(null);
     }
-  } else {
+
+    const { data: deptData } = await supabase.from('departments').select('*');
+    if (deptData) {
+      setDepartments(deptData);
+      if (deptData.length > 0 && !departmentId) {
+        setDepartmentId(deptData[0].id);
+      }
+    }
+
+    const { data: wfpData, error } = await supabase
+      .from('wfps')
+      .select('*, departments(code, name)')
+      .order('created_at', { ascending: false });
+
+    if (!error && wfpData) {
+      setWfps(wfpData as WFPItem[]);
+    }
+    setLoading(false);
+  }
+
+  function handleSignOut() {
+    localStorage.removeItem('sdo_admin_session');
     setCurrentUser(null);
     setUserRole(null);
+    router.refresh();
   }
-
-  // 2. Fetch departments
-  const { data: deptData } = await supabase.from('departments').select('*');
-  if (deptData) {
-    setDepartments(deptData);
-    if (deptData.length > 0 && !departmentId) {
-      setDepartmentId(deptData[0].id);
-    }
-  }
-
-  // 3. Fetch WFPs
-  const { data: wfpData, error } = await supabase
-    .from('wfps')
-    .select('*, departments(code, name)')
-    .order('created_at', { ascending: false });
-
-  if (!error && wfpData) {
-    setWfps(wfpData as WFPItem[]);
-  }
-  setLoading(false);
-}
-// Update sign out logic
-function handleSignOut() {
-  localStorage.removeItem('sdo_admin_session');
-  setCurrentUser(null);
-  setUserRole(null);
-  router.refresh();
-}
 
   async function handleStatusChange(id: string, newStatus: string) {
     if (userRole !== 'admin') {
@@ -126,57 +121,73 @@ function handleSignOut() {
     setFormError(null);
     setFormSuccess(null);
 
-    if (!title.trim() || !aipCode.trim() || !departmentId || !allocatedBudget) {
+    if (!title.trim() || !aipCode.trim() || !departmentId) {
       setFormError('Please fill in all required fields.');
       return;
     }
 
-    const budgetValue = parseFloat(allocatedBudget);
-    if (isNaN(budgetValue) || budgetValue <= 0) {
-      setFormError('Please enter a valid allocation budget greater than zero.');
+    const q1 = parseFloat(q1Budget) || 0;
+    const q2 = parseFloat(q2Budget) || 0;
+    const q3 = parseFloat(q3Budget) || 0;
+    const q4 = parseFloat(q4Budget) || 0;
+    const totalBudget = q1 + q2 + q3 + q4;
+
+    if (totalBudget <= 0) {
+      setFormError('Please enter a valid financial budget requirement across quarters greater than zero.');
       return;
     }
 
     setSubmitting(true);
 
-    const { error } = await supabase.from('wfps').insert([
+    // 1. Insert into WFP table
+    const { data: wfpInsertData, error: wfpError } = await supabase.from('wfps').insert([
       {
         title: title.trim(),
         aip_code: aipCode.trim().toUpperCase(),
         department_id: departmentId,
-        total_allocated: budgetValue,
+        total_allocated: totalBudget,
         total_obligated: 0,
         total_disbursed: 0,
         status: 'For Review',
-        evidence_of_success: evidenceOfSuccess.trim(),
-        kpi: kpi.trim(),
-        leading_indicator: leadingIndicator.trim(),
-        lagging_indicator: laggingIndicator.trim(),
-        target: target.trim(),
+        evidence_of_success: performanceIndicators.trim(),
+        kpi: eligibleItems.trim(),
+        target: 'FY 2026 Target',
         user_id: currentUser?.id || null,
       },
-    ]);
+    ]).select().single();
+
+    if (wfpError) {
+      setFormError(wfpError.message || 'Failed to submit WFP item.');
+      setSubmitting(false);
+      return;
+    }
+
+    // 2. Also register a procurement request draft record to link the document checklist routing system
+    const { data: procData, error: procError } = await supabase
+      .from('procurement_requests')
+      .insert([
+        {
+          project_title: title.trim(),
+          current_step: 0,
+          current_office: 'Proponent',
+          status: 'Draft',
+          proponent_id: currentUser?.id || null,
+        },
+      ])
+      .select()
+      .single();
 
     setSubmitting(false);
 
-    if (error) {
-      setFormError(error.message || 'Failed to submit WFP item.');
+    if (procError) {
+      setFormError('WFP created, but procurement routing link failed: ' + procError.message);
     } else {
-      setFormSuccess('WFP Submission added successfully!');
-      setTitle('');
-      setAipCode('');
-      setAllocatedBudget('');
-      setEvidenceOfSuccess('');
-      setKpi('');
-      setLeadingIndicator('');
-      setLaggingIndicator('');
-      setTarget('');
-      checkSessionAndFetchData();
-      
+      setFormSuccess('WFP and Procurement Request created successfully!');
       setTimeout(() => {
         setIsModalOpen(false);
-        setFormSuccess(null);
-      }, 1200);
+        // Redirect proponent straight to the dynamic document checklist page
+        router.push(`/proponent/requests/${procData.id}`);
+      }, 1000);
     }
   }
 
@@ -226,7 +237,7 @@ function handleSignOut() {
       'PPA Title', 'Department Code', 'Department Name', 'AIP Code',
       'Focal Person', 'Allocated Budget (PHP)', 'Obligated Budget (PHP)',
       'Disbursed Budget (PHP)', 'BUR Obligation Rate (%)', 'Status',
-      'Evidence of Success', 'KPI', 'Leading Indicator', 'Lagging Indicator', 'Target', 'Created Date'
+      'Eligible Items', 'Performance Indicators / MOVs', 'Created Date'
     ];
 
     const rows = filteredWfps.map((wfp) => {
@@ -243,11 +254,8 @@ function handleSignOut() {
         `"${(wfp.profiles?.full_name || 'Unassigned').replace(/"/g, '""')}"`,
         allocated, obligated, disbursed, `${burRate}%`,
         `"${wfp.status || ''}"`,
-        `"${(wfp.evidence_of_success || '').replace(/"/g, '""')}"`,
         `"${(wfp.kpi || '').replace(/"/g, '""')}"`,
-        `"${(wfp.leading_indicator || '').replace(/"/g, '""')}"`,
-        `"${(wfp.lagging_indicator || '').replace(/"/g, '""')}"`,
-        `"${(wfp.target || '').replace(/"/g, '""')}"`,
+        `"${(wfp.evidence_of_success || '').replace(/"/g, '""')}"`,
         `"${wfp.created_at ? new Date(wfp.created_at).toLocaleDateString() : ''}"`
       ];
     });
@@ -283,7 +291,6 @@ function handleSignOut() {
       { id: 5, title: 'Obligation & Disbursement', description: 'Implementation phase & financial liquidation', completed: isApproved && Number(selectedWfpForTracking?.total_disbursed || 0) > 0, current: isApproved && Number(selectedWfpForTracking?.total_disbursed || 0) === 0 }
     ];
   };
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* Header */}
@@ -722,14 +729,16 @@ function handleSignOut() {
         </div>
       )}
 
-      {/* WFP Submission Modal */}
+     {/* WFP Submission Modal Aligned with FY 2026 Template */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl my-8 overflow-hidden animate-in fade-in zoom-in duration-150">
+            
+            {/* Modal Header */}
             <div className="bg-blue-900 text-white px-6 py-4 flex justify-between items-center border-b-2 border-amber-400">
               <div>
-                <h3 className="font-bold text-lg">Submit New WFP Item</h3>
-                <p className="text-xs text-blue-200">Local School Board / Division Work & Financial Plan</p>
+                <h3 className="font-bold text-lg">Submit New WFP Item (FY 2026)</h3>
+                <p className="text-xs text-blue-200">Local School Board / Division Work & Financial Plan Template</p>
               </div>
               <button 
                 onClick={() => setIsModalOpen(false)}
@@ -754,128 +763,157 @@ function handleSignOut() {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Program / Project / Activity (PPA) Title *
-                </label>
-                <input 
-                  type="text"
-                  required
-                  placeholder="e.g. ARAL Program Learning Recovery Workshop"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              {/* Section 1: Activity & Department Details */}
+              <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Department / Division *
-                  </label>
-                  <select
-                    required
-                    value={departmentId}
-                    onChange={(e) => setDepartmentId(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
-                  >
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.code} - {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    AIP Code Alignment *
+                    Program / Project / Activity (PPA) Title *
                   </label>
                   <input 
                     type="text"
                     required
-                    placeholder="e.g. AIP-2026-CID-001"
-                    value={aipCode}
-                    onChange={(e) => setAipCode(e.target.value)}
+                    placeholder="e.g. ARAL Program Learning Recovery Workshop"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Department / Division *
+                    </label>
+                    <select
+                      required
+                      value={departmentId}
+                      onChange={(e) => setDepartmentId(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-800"
+                    >
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.code} - {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      AIP Code Alignment *
+                    </label>
+                    <input 
+                      type="text"
+                      required
+                      placeholder="e.g. AIP-2026-CID-001"
+                      value={aipCode}
+                      onChange={(e) => setAipCode(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Eligible Expense Items *
+                  </label>
+                  <input 
+                    type="text"
+                    required
+                    placeholder="e.g. Supplies & Materials, Catering Services, Board & Lodging"
+                    value={eligibleItems}
+                    onChange={(e) => setEligibleItems(e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Allocated Budget (PHP ₱) *
-                </label>
-                <input 
-                  type="number"
-                  step="0.01"
-                  min="1"
-                  required
-                  placeholder="e.g. 150000"
-                  value={allocatedBudget}
-                  onChange={(e) => setAllocatedBudget(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
-                />
-              </div>
-
-              {/* Indicator Fields */}
-              <div className="pt-2 border-t border-slate-100">
-                <p className="text-xs font-bold text-blue-900 uppercase mb-3">Performance Indicators & Monitoring</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Evidence of Success</label>
-                    <input 
-                      type="text"
-                      placeholder="e.g. Activity Completion Report"
-                      value={evidenceOfSuccess}
-                      onChange={(e) => setEvidenceOfSuccess(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Key Performance Indicator (KPI)</label>
-                    <input 
-                      type="text"
-                      placeholder="e.g. % of participants trained"
-                      value={kpi}
-                      onChange={(e) => setKpi(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Leading Indicator</label>
-                    <input 
-                      type="text"
-                      placeholder="e.g. Module pre-test scores"
-                      value={leadingIndicator}
-                      onChange={(e) => setLeadingIndicator(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Lagging Indicator</label>
-                    <input 
-                      type="text"
-                      placeholder="e.g. Annual reading literacy rate"
-                      value={laggingIndicator}
-                      onChange={(e) => setLaggingIndicator(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
-                    />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Target</label>
+              {/* Section 2: Performance Indicators / MOVs */}
+              <div className="pt-3 border-t border-slate-200">
+                <p className="text-xs font-bold text-blue-900 uppercase mb-2">
+                  Performance Indicators & Means of Verification (MOVs)
+                </p>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Performance Indicators / MOVs *
+                  </label>
                   <input 
                     type="text"
-                    placeholder="e.g. 100% of target teachers proficient"
-                    value={target}
-                    onChange={(e) => setTarget(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-800"
+                    required
+                    placeholder="e.g. Activity Completion Report, Attendance Sheets, Training Materials"
+                    value={performanceIndicators}
+                    onChange={(e) => setPerformanceIndicators(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
                   />
                 </div>
               </div>
 
-              <div className="pt-3 flex justify-end gap-3 border-t border-slate-100 mt-6">
+              {/* Section 3: Financial Requirements Breakdown (Q1 - Q4) */}
+              <div className="pt-3 border-t border-slate-200">
+                <p className="text-xs font-bold text-blue-900 uppercase mb-2">
+                  Financial Requirements Breakdown (FY 2026)
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Q1 (₱)</label>
+                    <input 
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={q1Budget}
+                      onChange={(e) => setQ1Budget(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Q2 (₱)</label>
+                    <input 
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={q2Budget}
+                      onChange={(e) => setQ2Budget(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Q3 (₱)</label>
+                    <input 
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={q3Budget}
+                      onChange={(e) => setQ3Budget(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Q4 (₱)</label>
+                    <input 
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={q4Budget}
+                      onChange={(e) => setQ4Budget(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-700">Total Financial Requirement:</span>
+                  <span className="text-sm font-extrabold text-blue-900">
+                    ₱{((Number(q1Budget) || 0) + (Number(q2Budget) || 0) + (Number(q3Budget) || 0) + (Number(q4Budget) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 mt-6">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -888,7 +926,7 @@ function handleSignOut() {
                   disabled={submitting}
                   className="px-5 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-bold transition disabled:opacity-50"
                 >
-                  {submitting ? 'Submitting...' : 'Submit WFP'}
+                  {submitting ? 'Submitting WFP...' : 'Submit WFP & Proceed to Checklist'}
                 </button>
               </div>
             </form>
