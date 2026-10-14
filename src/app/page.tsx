@@ -139,7 +139,7 @@ export default function AdminDashboard() {
 
     setSubmitting(true);
 
-    // 1. Insert into WFP table (without user_id)
+    // 1. Insert into WFP table
     const { data: wfpInsertData, error: wfpError } = await supabase.from('wfps').insert([
       {
         title: title.trim(),
@@ -161,18 +161,22 @@ export default function AdminDashboard() {
       return;
     }
 
-    // 2. Also register a procurement request draft record to link the document checklist routing system
+    // 2. Register procurement request draft (omitting proponent_id if not an actual Supabase auth user UUID)
+    const procurementPayload: any = {
+      project_title: title.trim(),
+      current_step: 0,
+      current_office: 'Proponent',
+      status: 'Draft',
+    };
+
+    // Only attach proponent_id if currentUser?.id is a valid UUID string
+    if (currentUser?.id && typeof currentUser.id === 'string' && currentUser.id.length > 20) {
+      procurementPayload.proponent_id = currentUser.id;
+    }
+
     const { data: procData, error: procError } = await supabase
       .from('procurement_requests')
-      .insert([
-        {
-          project_title: title.trim(),
-          current_step: 0,
-          current_office: 'Proponent',
-          status: 'Draft',
-          proponent_id: currentUser?.id || null,
-        },
-      ])
+      .insert([procurementPayload])
       .select()
       .single();
 
