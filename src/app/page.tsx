@@ -380,12 +380,6 @@ export default function AdminDashboard() {
                     <strong>Public View Mode:</strong> You are currently viewing public WFP tracking data. Only authenticated <strong>Division Administrators</strong> can approve or revise submission statuses.
                   </span>
                 </div>
-                <button
-                  onClick={() => router.push('/login')}
-                  className="px-3 py-1.5 bg-amber-600 text-white rounded font-bold text-xs hover:bg-amber-700 transition"
-                >
-                  Admin Login
-                </button>
               </div>
             )}
 

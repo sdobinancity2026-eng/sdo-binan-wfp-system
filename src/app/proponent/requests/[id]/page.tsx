@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 const CHECKLIST_ITEMS = [
@@ -16,9 +16,9 @@ const CHECKLIST_ITEMS = [
   { id: 'app', label: 'h) Signed APP / Supp APP' },
 ];
 
-export default function RequestChecklistPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const requestId = resolvedParams.id;
+export default function RequestChecklistPage() {
+  const params = useParams();
+  const requestId = params?.id as string;
   const router = useRouter();
 
   const [uploading, setUploading] = useState<string | null>(null);
@@ -28,6 +28,8 @@ export default function RequestChecklistPage({ params }: { params: Promise<{ id:
   const supabase = createClient();
 
   useEffect(() => {
+    if (!requestId) return;
+
     async function loadRequestData() {
       // Fetch request details
       const { data: reqData } = await supabase
