@@ -182,13 +182,12 @@ export default function AdminDashboard() {
 
     setSubmitting(false);
 
-    if (procError) {
-      setFormError('WFP created, but procurement routing link failed: ' + procError.message);
+    if (procError || !procData) {
+      setFormError('WFP created, but procurement routing link failed: ' + (procError?.message || 'No response data'));
     } else {
       setFormSuccess('WFP and Procurement Request created successfully!');
       setTimeout(() => {
         setIsModalOpen(false);
-        // Redirect proponent straight to the dynamic document checklist page
         router.push(`/proponent/requests/${procData.id}`);
       }, 1000);
     }
