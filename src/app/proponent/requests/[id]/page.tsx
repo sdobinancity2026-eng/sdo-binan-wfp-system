@@ -63,7 +63,9 @@ export default function RequestChecklistPage() {
     try {
       setUploading(docType);
 
-      const filePath = `${requestId}/${docType}_${Date.now()}_${file.name}`;
+      // Sanitize filename: remove spaces and special characters
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const filePath = `${requestId}/${docType}_${Date.now()}_${cleanFileName}`;
 
       // 1. Upload to Supabase Storage
       const { data: storageData, error: storageError } = await supabase.storage
