@@ -139,7 +139,7 @@ export default function AdminDashboard() {
 
     setSubmitting(true);
 
-    // 1. Insert into WFP table
+    // 1. Insert into WFP table (without user_id)
     const { data: wfpInsertData, error: wfpError } = await supabase.from('wfps').insert([
       {
         title: title.trim(),
@@ -152,7 +152,6 @@ export default function AdminDashboard() {
         evidence_of_success: performanceIndicators.trim(),
         kpi: eligibleItems.trim(),
         target: 'FY 2026 Target',
-        user_id: currentUser?.id || null,
       },
     ]).select().single();
 
