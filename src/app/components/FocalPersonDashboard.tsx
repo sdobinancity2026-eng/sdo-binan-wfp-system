@@ -1,31 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
-  FileText, Clock, CheckCircle2, Layers, Building2, Eye, Plus 
+  FileText, Clock, CheckCircle2, Layers, Building2, Eye, Plus, RefreshCw 
 } from 'lucide-react';
-import { WFPItem } from '@/types/wfp';
+import { createClient } from '@/lib/supabase/client';
 
 export default function FocalPersonDashboard({ 
-  wfps, 
   currentUser,
   onOpenSubmitModal 
 }: { 
-  wfps: WFPItem[]; 
   currentUser: any;
   onOpenSubmitModal?: () => void;
 }) {
-  // Tab switch state: 'active_tracker' | 'all_submissions'
   const [activeTab, setActiveTab] = useState<'active_tracker' | 'all_submissions'>('active_tracker');
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
-  // Filter WFPs belonging to the logged-in focal person's office/department
-  const userWfps = wfps.filter(
-    (wfp) => 
-      !currentUser?.office || 
-      (wfp.departments?.name || wfp.departments?.code || '')
-        .toLowerCase()
-        .includes(currentUser.office.toLowerCase())
-  );
+  useEffect(() => {
+    async function fetchAllSubmissions() {
+      setLoading(true);
+      // Fetch procurement requests and join/fetch related data
+      const { data, error } = await supabase
+        .from('procurement_requests')
+        .select(`
+          *,
+          procurement_documents(document_type, file_name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setRequests(data);
+      }
+      setLoading(false);
+    }
+
+    fetchAllSubmissions();
+  }, [supabase]);
 
   return (
     <div className="space-y-6">
@@ -37,7 +49,7 @@ export default function FocalPersonDashboard({
             <span>Focal Person Portal — {currentUser?.office || 'Department Unit'}</span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Track activity status, monitor workflow routing, and view complete WFP records.
+            Track activity status, monitor workflow routing, and view complete procurement & WFP records.
           </p>
         </div>
 
@@ -52,7 +64,7 @@ export default function FocalPersonDashboard({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Clock className="w-4 h-4" /> Workflow & Activity Tracker ({userWfps.length})
+              <Clock className="w-4 h-4" /> Workflow & Activity Tracker ({requests.length})
             </button>
             <button
               onClick={() => setActiveTab('all_submissions')}
@@ -62,7 +74,7 @@ export default function FocalPersonDashboard({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Layers className="w-4 h-4" /> All Submitted WFPs ({userWfps.length})
+              <Layers className="w-4 h-4" /> All Submitted Requests ({requests.length})
             </button>
           </div>
 
@@ -77,94 +89,79 @@ export default function FocalPersonDashboard({
         </div>
       </div>
 
-      {/* TAB 1 & TAB 2: UNIFIED COMPREHENSIVE ACTIVITY & WFP TABLE */}
+      {/* UNIFIED SUBMISSIONS TABLE */}
       {(activeTab === 'active_tracker' || activeTab === 'all_submissions') && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              {activeTab === 'active_tracker' ? (
-                <>
-                  <Clock className="w-4 h-4 text-amber-500" />
-                  Workflow & Activity Tracker — Office Submissions
-                </>
-              ) : (
-                <>
-                  <FileText className="w-4 h-4 text-blue-900" />
-                  All Submitted Work and Financial Plans & Document Checklist Status
-                </>
-              )}
+              <FileText className="w-4 h-4 text-blue-900" />
+              {activeTab === 'active_tracker' 
+                ? 'Workflow & Activity Tracker — Active Procurement Packages' 
+                : 'All Submitted Procurement Requests & Document Checklists'}
             </h3>
             <span className="text-xs text-slate-500 font-medium">
-              Total Records: <strong className="text-blue-900">{userWfps.length}</strong>
+              Total Records: <strong className="text-blue-900">{requests.length}</strong>
             </span>
           </div>
 
-          {userWfps.length === 0 ? (
+          {loading ? (
+            <div className="p-12 text-center text-slate-500 text-xs">Loading records from Supabase...</div>
+          ) : requests.length === 0 ? (
             <div className="p-12 text-center text-slate-500 text-xs">
-              No active Work and Financial Plan submissions found for your office. Click **Submit WFP** to start a new request.
+              No procurement requests or WFP submissions found in Supabase. Click **Submit WFP** to start a new request.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-100 text-slate-600 border-b border-slate-200 uppercase text-[10px] font-bold">
-                    <th className="p-3">Program / Project / Activity (PPA) Title</th>
-                    <th className="p-3">Department / Division</th>
-                    <th className="p-3">AIP Code</th>
-                    <th className="p-3">Total Allocation</th>
-                    <th className="p-3">Workflow Stage / Location</th>
+                    <th className="p-3">Project / Activity Title</th>
+                    <th className="p-3">Current Office Location</th>
+                    <th className="p-3">Workflow Step</th>
+                    <th className="p-3">Uploaded Documents</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {userWfps.map((wfp) => {
-                    const allocated = Number(wfp.total_allocated || 0);
+                  {requests.map((req) => {
+                    const uploadedCount = req.procurement_documents?.length || 0;
 
                     return (
-                      <tr key={wfp.id} className="hover:bg-slate-50 transition">
+                      <tr key={req.id} className="hover:bg-slate-50 transition">
                         <td className="p-3">
-                          <p className="font-bold text-slate-800 text-sm">{wfp.title}</p>
-                          {wfp.kpi && (
-                            <p className="text-[11px] text-slate-500 mt-0.5 truncate max-w-xs">
-                              <span className="font-semibold text-slate-600">Eligible Items:</span> {wfp.kpi}
-                            </p>
-                          )}
+                          <p className="font-bold text-slate-800 text-sm">{req.project_title}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">ID: {req.id.slice(0, 8)}...</p>
                         </td>
-                        <td className="p-3 font-semibold text-slate-600">
-                          {wfp.departments?.code || wfp.departments?.name || currentUser?.office || '-'}
-                        </td>
-                        <td className="p-3">
-                          <span className="bg-blue-50 text-blue-900 font-bold px-2 py-0.5 rounded border border-blue-200 text-[10px]">
-                            {wfp.aip_code || 'AIP-Aligned'}
+                        <td className="p-3 font-semibold text-slate-700">
+                          <span className="bg-blue-50 text-blue-900 px-2.5 py-1 rounded-md border border-blue-200">
+                            {req.current_office || 'Proponent'}
                           </span>
                         </td>
-                        <td className="p-3 font-extrabold text-blue-900">
-                          ₱{allocated.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        <td className="p-3 font-bold text-slate-800">
+                          Step {req.current_step || 0} of 15
                         </td>
                         <td className="p-3">
-                          <span className="bg-slate-200 text-slate-800 text-[10px] font-bold px-2.5 py-1 rounded">
-                            {wfp.status === 'Approved' ? 'Final Approval Phase' : 'Division Review Section'}
+                          <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            {uploadedCount} / 9 Uploaded
                           </span>
                         </td>
                         <td className="p-3">
                           <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded uppercase inline-block ${
-                            wfp.status === 'Approved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                            wfp.status === 'Needs Revision' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
-                            'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
+                            req.status === 'Approved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                            req.status === 'Pending Review' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                            'bg-slate-100 text-slate-700 border border-slate-300'
                           }`}>
-                            {wfp.status || 'For Review'}
+                            {req.status || 'Draft'}
                           </span>
                         </td>
                         <td className="p-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <a
-                              href={`/proponent/requests/${wfp.id}`}
-                              className="bg-blue-900 hover:bg-blue-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
-                            >
-                              <Eye className="w-3.5 h-3.5" /> View Checklist
-                            </a>
-                          </div>
+                          <a
+                            href={`/proponent/requests/${req.id}`}
+                            className="bg-blue-900 hover:bg-blue-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition inline-flex items-center gap-1 shadow-sm"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> View Checklist
+                          </a>
                         </td>
                       </tr>
                     );
