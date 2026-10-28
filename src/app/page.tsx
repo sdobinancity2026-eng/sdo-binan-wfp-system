@@ -139,21 +139,30 @@ export default function AdminDashboard() {
 
     setSubmitting(true);
 
-    // 1. Insert into WFP table
-    const { data: wfpInsertData, error: wfpError } = await supabase.from('wfps').insert([
-      {
-        title: title.trim(),
-        aip_code: aipCode.trim().toUpperCase(),
-        department_id: departmentId,
-        total_allocated: totalBudget,
-        total_obligated: 0,
-        total_disbursed: 0,
-        status: 'For Review',
-        evidence_of_success: performanceIndicators.trim(),
-        kpi: eligibleItems.trim(),
-        target: 'FY 2026 Target',
-      },
-    ]).select().single();
+    // 1. Prepare WFP payload and attach focal_person_id if valid
+    const wfpPayload: any = {
+      title: title.trim(),
+      fiscal_year: '2026',
+      aip_code: aipCode.trim().toUpperCase(),
+      department_id: departmentId,
+      total_allocated: totalBudget,
+      total_obligated: 0,
+      total_disbursed: 0,
+      status: 'For Review',
+      evidence_of_success: performanceIndicators.trim(),
+      kpi: eligibleItems.trim(),
+      target: 'FY 2026 Target',
+    };
+
+    if (currentUser?.id && typeof currentUser.id === 'string' && currentUser.id.length > 20) {
+      wfpPayload.focal_person_id = currentUser.id;
+    }
+
+    const { data: wfpInsertData, error: wfpError } = await supabase
+      .from('wfps')
+      .insert([wfpPayload])
+      .select()
+      .single();
 
     if (wfpError) {
       setFormError(wfpError.message || 'Failed to submit WFP item.');
@@ -161,7 +170,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    // 2. Register procurement request draft (omitting proponent_id if not an actual Supabase auth user UUID)
+    // 2. Register procurement request draft
     const procurementPayload: any = {
       project_title: title.trim(),
       current_step: 0,
@@ -169,7 +178,6 @@ export default function AdminDashboard() {
       status: 'Draft',
     };
 
-    // Only attach proponent_id if currentUser?.id is a valid UUID string
     if (currentUser?.id && typeof currentUser.id === 'string' && currentUser.id.length > 20) {
       procurementPayload.proponent_id = currentUser.id;
     }

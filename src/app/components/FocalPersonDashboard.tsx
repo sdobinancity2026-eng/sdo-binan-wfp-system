@@ -5,11 +5,14 @@ import {
   FileText, Clock, CheckCircle2, Layers, Building2, Eye, Plus, RefreshCw 
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { WFPItem } from '@/types/wfp';
 
 export default function FocalPersonDashboard({ 
+  wfps,
   currentUser,
   onOpenSubmitModal 
 }: { 
+  wfps?: WFPItem[];
   currentUser: any;
   onOpenSubmitModal?: () => void;
 }) {
